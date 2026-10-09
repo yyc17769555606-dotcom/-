@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport-fit=cover：让页面延伸到刘海区域，配合 env(safe-area-inset-*) 处理安全区 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>训练记录</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="训练记录" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+
+  <!-- Vue 3（本地文件，避免 CDN 依赖，离线可用） -->
+  <script src="vue.global.prod.js"></script>
+  <!-- Chart.js（折线图，本地文件避免 CDN 被拦截） -->
+  <script src="chart.umd.min.js"></script>
+  <!-- Tailwind CSS（本地文件，离线可用） -->
+  <script src="tailwindcss.js"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+
+  <style>
+    html, body {
+      height: 100%;
+      /* 禁止橡皮筋滚动 / 下拉刷新，更接近原生 App 手感 */
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    /* 输入框字号不小于 16px，避免 iOS 聚焦时自动放大页面 */
+    select, input, button { font-size: 16px; }
+    /* 去掉 number 输入框的步进按钮（移动端通常不需要） */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+    /* 隐藏横向滚动条（Pill 选择器） */
+    .rest-pills::-webkit-scrollbar { display: none; }
+    .rest-pills { -ms-overflow-style: none; scrollbar-width: none; }
+    /* Toast 过渡动画 */
+    .toast-enter-active, .toast-leave-active { transition: opacity .2s ease, transform .2s ease; }
+    .toast-enter-from, .toast-leave-to { opacity: 0; transform: translate(-50%, -8px); }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-200 antialiased">
+
+<div id="app" class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-900">
+
+  <!-- 顶部栏：标题 + 历史记录 / 配置管理入口 -->
+  <header class="flex items-center justify-between px-4 h-14 border-b border-slate-800 shrink-0">
+    <h1 class="text-base font-semibold text-slate-100">训练记录</h1>
+    <div class="flex items-center gap-1">
+      <button type="button" @click="openHistory" aria-label="历史记录"
+        class="flex items-center justify-center w-10 h-10 rounded-lg text-slate-300
+               hover:bg-slate-800 active:bg-slate-700 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3v5h5" />
+          <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+          <path d="M12 7v5l4 2" />
+        </svg>
+      </button>
+      <button type="button" @click="openConfig" aria-label="配置管理"
+        class="flex items-center justify-center w-10 h-10 rounded-lg text-slate-300
+               hover:bg-slate-800 active:bg-slate-700 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Tab 导航：训练记录 / 力量标准 -->
+  <nav class="flex shrink-0 border-b border-slate-800">
+    <button type="button" @click="activeTab = 'log'"
+      :class="activeTab === 'log' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-400 border-b-2 border-transparent'"
+      class="flex-1 h-11 text-sm font-medium transition-colors">训练记录</button>
+    <button type="button" @click="activeTab = 'standards'"
+      :class="activeTab === 'standards' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-400 border-b-2 border-transparent'"
+      class="flex-1 h-11 text-sm font-medium transition-colors">力量标准</button>
+  </nav>
+
+  <!-- ============ 训练记录页面 ============ -->
+  <template v-if="activeTab === 'log'">
+  <!-- 今日状态模块：日期 + 状态徽章（点击展开输入面板） -->
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
+    <span class="text-sm text-slate-300">{{ todayDateStr }}</span>
+    <button type="button" @click="statusPanelOpen = !statusPanelOpen"
+      :class="scoreInfo.cls"
+      class="flex items-center gap-1.5 h-8 px-3 rounded-full border text-xs font-medium whitespace-nowrap">
+      <span class="w-1.5 h-1.5 rounded-full" :style="{ background: scoreInfo.dot }"></span>
+      {{ scoreInfo.text }}
+    </button>
+  </div>
+
+  <!-- 状态输入面板（展开态） -->
+  <div v-if="statusPanelOpen" class="px-4 pb-4 space-y-3 border-b border-slate-800 shrink-0">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-slate-300">入睡时间</label>
+        <input type="time" v-model="sleepTime"
+          class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-slate-300">睡眠时长 (小时)</label>
+        <input type="number" step="0.5" min="0" v-model.number="sleepDuration"
+          placeholder="如 7.5"
+          class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <button type="button" @click="computeStatus"
+        class="flex-1 h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold
+               active:bg-blue-700 transition-colors">计算状态</button>
+      <button type="button" @click="statusPanelOpen = false"
+        class="h-11 px-5 rounded-xl bg-slate-700 text-slate-100 text-sm
+               active:bg-slate-600 transition-colors">取消</button>
+    </div>
+  </div>
+
+  <!-- 可滚动的主内容区 -->
+  <main class="flex-1 overflow-y-auto px-4 pt-6 pb-6 space-y-6">
+
+    <!-- 补录模式开关 -->
+    <div class="flex items-center justify-between rounded-xl bg-slate-800/60 border border-slate-700 px-4 py-3">
+      <button type="button" @click="toggleBackfill" class="flex items-center gap-3 min-w-0">
+        <span class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          :class="backfillMode ? 'bg-blue-500' : 'bg-slate-600'">
+          <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+            :class="backfillMode ? 'translate-x-6' : 'translate-x-1'"></span>
+        </span>
+        <span class="text-sm font-medium text-slate-200">补录历史训练</span>
+      </button>
+      <span v-if="backfillMode" class="text-xs text-blue-300">可自定义日期</span>
+    </div>
+
+    <!-- 补录日期时间选择器（仅补录模式显示） -->
+    <div v-if="backfillMode" class="space-y-2">
+      <label for="backfillDate" class="block text-sm font-medium text-slate-300">训练日期时间</label>
+      <input type="datetime-local" id="backfillDate" v-model="backfillDate"
+        class="w-full h-12 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      <p class="text-xs text-slate-500">补录的记录将按此日期时间排序，睡眠评分不记录。</p>
+    </div>
+
+    <!-- 下拉选择器 -->
+    <div class="space-y-4">
+      <div class="space-y-2">
+        <label for="place" class="block text-sm font-medium text-slate-300">地点</label>
+        <select id="place" v-model="place"
+          class="w-full h-12 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                 appearance-none bg-no-repeat pr-10"
+          style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22/></svg>');background-position:right 0.875rem center;">
+          <option v-for="p in places" :key="p" :value="p">{{ p }}</option>
+        </select>
+      </div>
+
+      <div class="space-y-2">
+        <label for="action" class="block text-sm font-medium text-slate-300">动作</label>
+        <div class="relative">
+          <button type="button" id="action" @click="actionDropdownOpen = !actionDropdownOpen"
+            class="w-full h-12 rounded-xl bg-slate-800 border border-slate-700 px-3 flex items-center justify-between gap-2
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-slate-100 truncate">{{ action || '请选择动作' }}</span>
+              <action-badges v-if="currentActionObj" :level1="currentActionObj.level1" :level2="currentActionObj.level2"></action-badges>
+              <span class="flex-shrink-0 text-xs font-medium tabular-nums"
+                :style="{ color: lastActionInfo ? lastActionInfo.color : '#64748b' }">
+                {{ lastActionInfo ? '间隔 ' + lastActionInfo.hoursAgo + 'h' : '无记录' }}
+              </span>
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><polyline points="6 9 12 15 18 9" /></svg>
+          </button>
+          <div v-if="actionDropdownOpen" class="absolute inset-x-0 top-full mt-1 z-30 rounded-xl bg-slate-800 border border-slate-700 shadow-xl max-h-64 overflow-y-auto">
+            <button v-for="a in actions" :key="a.name" type="button"
+              @click="action = a.name; actionDropdownOpen = false"
+              class="w-full text-left px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-slate-700/60">
+              <span class="text-slate-100 text-sm truncate">{{ a.name }}</span>
+              <action-badges :level1="a.level1" :level2="a.level2"></action-badges>
+            </button>
+          </div>
+          <!-- 点击外部关闭 -->
+          <div v-if="actionDropdownOpen" class="fixed inset-0 z-20" @click="actionDropdownOpen = false"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数字输入框：并排，重量占比更大，次数收窄并右移 -->
+    <div class="grid grid-cols-[3fr_2fr] gap-3">
+      <div class="space-y-2">
+        <label for="weight" class="block text-sm font-medium text-slate-300">重量 (kg)</label>
+        <div class="relative">
+          <input id="weight" v-model.number="weight" type="number" inputmode="decimal" min="0" step="0.5"
+            class="w-full h-12 rounded-xl bg-slate-800 border border-slate-700 px-3 pr-20 text-slate-100
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <div class="absolute inset-y-0 right-1 flex items-center gap-1">
+            <button type="button" @click="addWeight(2.5)"
+              class="h-8 w-9 rounded-lg bg-slate-700 text-slate-200 text-xs font-semibold
+                     hover:bg-slate-600 active:bg-slate-500 transition-colors">+2.5</button>
+            <button type="button" @click="addWeight(5)"
+              class="h-8 w-9 rounded-lg bg-slate-700 text-slate-200 text-xs font-semibold
+                     hover:bg-slate-600 active:bg-slate-500 transition-colors">+5</button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between gap-2">
+          <button v-if="lastActionInfo" type="button" @click="openActionRecords"
+            class="shrink-0 text-xs text-slate-400 hover:text-slate-200 transition-colors underline decoration-dotted underline-offset-2">
+            上次：{{ lastActionInfo.lastWeight }} kg
+          </button>
+          <p v-else class="text-xs text-slate-500 shrink-0">&nbsp;</p>
+          <button type="button" @click="applyDeload"
+            class="shrink-0 h-6 px-2.5 rounded-full bg-slate-700/90 text-[11px] font-semibold text-orange-300
+                   hover:bg-slate-600 active:bg-slate-500 transition-colors leading-none">
+            -{{ deloadPercent }}%
+          </button>
+        </div>
+      </div>
+      <div class="space-y-2 pl-2">
+        <label for="reps" class="block text-sm font-medium text-slate-300">次数</label>
+        <input id="reps" v-model.number="reps" type="number" inputmode="numeric" min="0" step="1"
+          class="w-full h-12 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        <p v-if="lastActionInfo" class="text-xs text-slate-500">上次：{{ lastActionInfo.lastReps }} 次 × {{ lastActionInfo.lastSets }} 组</p>
+      </div>
+    </div>
+
+    <!-- 组间歇：Pill 胶囊单选（横向滚动，状态驻留） -->
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-300">组间歇</label>
+      <div class="rest-pills flex gap-2 overflow-x-auto pb-1">
+        <button v-for="opt in restTimeOptions" :key="opt" type="button"
+          @click="restTime = opt"
+          :class="restTime === opt
+            ? 'bg-blue-600 text-white border-blue-600'
+            : 'bg-slate-800 text-slate-300 border-slate-700'"
+          class="shrink-0 h-10 px-4 rounded-full border text-sm font-medium whitespace-nowrap
+                 active:scale-95 transition">
+          {{ opt }}
+        </button>
+      </div>
+      <input v-if="restTime === '自定义'" v-model="customRestTime" type="text"
+        placeholder="如 2.5min 或 40s"
+        class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+    </div>
+
+    <!-- 添加此组 -->
+    <button type="button" @click="addGroup"
+      class="w-full h-12 rounded-xl bg-blue-600 text-white text-base font-semibold
+             active:bg-blue-700 transition-colors focus:outline-none focus:ring-2
+             focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900">
+      添加此组
+    </button>
+
+    <!-- 总容量（自动计算） -->
+    <div class="flex items-center justify-between rounded-xl bg-slate-800/70 border border-slate-700 px-4 py-3">
+      <span class="text-sm text-slate-400">总容量</span>
+      <span class="text-lg font-semibold text-slate-100">{{ totalVolume }} <span class="text-sm font-normal text-slate-400">kg</span></span>
+    </div>
+
+    <!-- 组列表 -->
+    <section class="space-y-2">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-sm font-medium text-slate-300">已完成组</h2>
+        <span v-if="currentActionObj" class="flex items-center gap-2 min-w-0">
+          <span class="text-xs text-slate-400 truncate">{{ currentActionObj.name }}</span>
+          <action-badges :level1="currentActionObj.level1" :level2="currentActionObj.level2"></action-badges>
+        </span>
+      </div>
+      <ul class="space-y-2">
+        <li v-if="sets.length === 0"
+          class="text-center text-sm text-slate-500 py-8 border border-dashed border-slate-700/70 rounded-xl">
+          还没有添加训练组
+        </li>
+        <li v-for="(s, index) in sets" :key="index"
+          class="flex items-center justify-between rounded-xl bg-slate-800 border border-slate-700/70 px-4 h-12">
+          <span class="text-sm text-slate-400">第{{ index + 1 }}组</span>
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-medium text-slate-100 tabular-nums">{{ s.weight }} kg × {{ s.reps }} <span v-if="s.restTime" class="text-slate-400 font-normal">(间歇: {{ s.restTime }})</span></span>
+            <button type="button" @click="removeSet(index)" aria-label="删除该组"
+              class="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 text-red-400
+                     active:bg-red-500/25 transition-colors focus:outline-none focus:ring-2
+                     focus:ring-red-500/50">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- 底部固定操作栏：通栏双按钮 + iPhone 底部安全区留白 -->
+  <footer
+    class="shrink-0 border-t border-slate-800 bg-slate-900/95 backdrop-blur px-4 pt-3 pb-3"
+    style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));">
+    <div class="grid grid-cols-2 gap-4">
+      <button type="button" @click="confirm"
+        :class="backfillMode
+          ? 'h-12 rounded-xl bg-amber-600 text-white text-base font-semibold active:bg-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900'
+          : 'h-12 rounded-xl bg-blue-600 text-white text-base font-semibold active:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900'">
+        {{ backfillMode ? '补录确认' : '确认' }}
+      </button>
+      <button type="button" @click="cancel"
+        class="h-12 rounded-xl bg-slate-700 text-slate-100 text-base font-semibold
+               active:bg-slate-600 transition-colors focus:outline-none focus:ring-2
+               focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900">
+        取消
+      </button>
+    </div>
+  </footer>
+  </template>
+
+  <!-- ============ 力量标准页面 ============ -->
+  <template v-if="activeTab === 'standards'">
+  <!-- 全局状态：当前体重（驱动模块一、二实时重算） -->
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
+    <label class="text-sm font-medium text-slate-300">当前体重 (kg)</label>
+    <input type="number" v-model.number="bodyWeight" min="1" step="0.1"
+      class="w-32 h-10 rounded-lg bg-slate-800 border border-slate-700 px-3 text-slate-100 text-right tabular-nums
+             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+  </div>
+
+  <main class="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-6">
+    <!-- 模块一：实测做组数据输入与 1RM 估算 -->
+    <section class="space-y-3">
+      <h2 class="text-sm font-semibold text-slate-200">模块一 · 1RM 估算与评级</h2>
+      <div class="space-y-2">
+        <div v-for="(row, i) in strengthRows" :key="row.name"
+          class="rounded-xl bg-slate-800 border border-slate-700/70 p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-slate-100">{{ row.name }}</span>
+            <span class="text-[11px] text-slate-400" v-if="row.name === '负重引体向上'">做组重量为额外挂重</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="block text-xs text-slate-400">做组重量 (kg)</label>
+              <input type="number" v-model.number="strengthInputs[i].weight" min="0" step="0.5"
+                class="w-full h-10 rounded-lg bg-slate-900 border border-slate-700 px-2 text-slate-100 text-sm tabular-nums
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-xs text-slate-400">完成次数</label>
+              <input type="number" v-model.number="strengthInputs[i].reps" min="1" step="1"
+                class="w-full h-10 rounded-lg bg-slate-900 border border-slate-700 px-2 text-slate-100 text-sm tabular-nums
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">估算 1RM：<span class="text-slate-100 font-medium tabular-nums">{{ row.oneRMText }} kg</span></span>
+            <span class="text-slate-400">体重比：<span class="text-slate-100 font-medium tabular-nums">{{ row.ratio }}</span></span>
+          </div>
+          <div class="text-xs">
+            <span :class="row.rating.highlight ? 'text-red-400 font-semibold' : 'text-slate-300'">
+              评级：{{ row.rating.text }}
+            </span>
+          </div>
+          <button type="button"
+            @click="expandedRow = expandedRow === i ? -1 : i"
+            class="w-full h-9 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 text-xs font-medium transition-colors flex items-center justify-center gap-1">
+            <span>{{ expandedRow === i ? '收起配重推算' : '配重推算' }}</span>
+            <svg class="w-3.5 h-3.5 transition-transform" :class="{ 'rotate-180': expandedRow === i }"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <!-- 下钻子表格：做组配重推荐 -->
+          <div v-if="expandedRow === i" class="overflow-x-auto rounded-lg border border-slate-700/70">
+            <table class="w-full text-xs">
+              <thead class="bg-slate-900">
+                <tr>
+                  <th class="text-center px-2 py-2 text-slate-400 font-medium whitespace-nowrap">做组次数</th>
+                  <th class="text-center px-2 py-2 text-slate-400 font-medium whitespace-nowrap">1RM 百分比</th>
+                  <th class="text-left px-2 py-2 text-slate-400 font-medium">训练目的与属性</th>
+                  <th class="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">推荐做组重量</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in calcPrescription(row.name, row.oneRM, Number(bodyWeight) || 0)" :key="p.reps"
+                  class="border-t border-slate-700/50">
+                  <td class="px-2 py-2 text-center text-slate-100 tabular-nums whitespace-nowrap">{{ p.reps }} 次</td>
+                  <td class="px-2 py-2 text-center text-slate-100 tabular-nums whitespace-nowrap">{{ p.percentText }}</td>
+                  <td class="px-2 py-2 text-slate-300">{{ p.purpose }}</td>
+                  <td class="px-2 py-2 text-right text-emerald-400 font-medium tabular-nums whitespace-nowrap">{{ p.rec }}</td>
+                </tr>
+                <tr v-if="row.oneRM == null" class="border-t border-slate-700/50">
+                  <td colspan="4" class="px-2 py-3 text-center text-slate-500">请先输入做组重量与次数以估算 1RM</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 模块二：力量标准对照表 -->
+    <section class="space-y-3">
+      <h2 class="text-sm font-semibold text-slate-200">模块二 · 力量标准对照表</h2>
+      <div class="overflow-x-auto rounded-xl border border-slate-700/70">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-800">
+            <tr>
+              <th class="text-left px-3 py-2 text-slate-400 font-medium whitespace-nowrap">动作名称</th>
+              <th class="text-right px-3 py-2 text-slate-400 font-medium whitespace-nowrap">新手</th>
+              <th class="text-right px-3 py-2 text-slate-400 font-medium whitespace-nowrap">入门</th>
+              <th class="text-right px-3 py-2 text-slate-400 font-medium whitespace-nowrap">进阶</th>
+              <th class="text-right px-3 py-2 text-slate-400 font-medium whitespace-nowrap">菁英</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in standardsMatrix" :key="row.name" class="border-t border-slate-700/50">
+              <td class="px-3 py-2 text-slate-200 whitespace-nowrap">{{ row.name }}</td>
+              <td v-for="v in row.values" :key="v" class="px-3 py-2 text-right text-slate-100 tabular-nums whitespace-nowrap">{{ v }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  </template>
+
+  <!-- 配置管理弹层 -->
+  <div v-if="configPanel.open" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/60" @click="closeConfig"></div>
+    <div class="relative w-full max-w-md bg-slate-900 border-t sm:border border-slate-700 rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-y-auto p-4 space-y-6">
+      <div class="flex items-center justify-between sticky top-0 bg-slate-900 py-1">
+        <h2 class="text-lg font-semibold text-slate-100">配置管理</h2>
+        <button type="button" @click="closeConfig" aria-label="关闭"
+          class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:bg-slate-800 active:bg-slate-700">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+
+      <!-- 新增地点 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300">新增地点</h3>
+        <div class="flex gap-2">
+          <input v-model="configPanel.newPlace" type="text" placeholder="地点名称"
+            class="flex-1 h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <button type="button" @click="addPlace"
+            class="h-11 px-4 rounded-xl bg-blue-600 text-white font-medium active:bg-blue-700">新增</button>
+        </div>
+      </section>
+
+      <!-- 删除地点 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300">删除地点</h3>
+        <div class="flex gap-2">
+          <select v-model="configPanel.delPlace"
+            class="flex-1 h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                   focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            <option value="">选择要删除的地点</option>
+            <option v-for="p in places" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <button type="button" @click="deletePlace"
+            class="h-11 px-4 rounded-xl bg-red-600 text-white font-medium active:bg-red-700">删除</button>
+        </div>
+      </section>
+
+      <!-- 新增动作 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300">新增动作</h3>
+        <select v-model="configPanel.addActionPlace"
+          class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="">选择地点</option>
+          <option v-for="p in places" :key="p" :value="p">{{ p }}</option>
+        </select>
+        <input v-model="configPanel.newAction" type="text" placeholder="动作名称"
+          class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        <!-- 一级分类 -->
+        <select v-model="configPanel.actionLevel1" @change="configPanel.actionLevel2 = ''"
+          class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="">选择一级分类</option>
+          <option v-for="l1 in level1Options" :key="l1" :value="l1">{{ l1 }}</option>
+        </select>
+        <!-- 二级分类（级联：仅显示当前一级的从属项） -->
+        <select v-model="configPanel.actionLevel2" :disabled="!configPanel.actionLevel1"
+          class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                 disabled:opacity-40 disabled:cursor-not-allowed">
+          <option value="">选择二级分类</option>
+          <option v-for="l2 in actionLevel2Options" :key="l2" :value="l2">{{ l2 }}</option>
+        </select>
+        <button type="button" @click="addAction"
+          :disabled="!configPanel.addActionPlace || !configPanel.newAction.trim() || !configPanel.actionLevel1 || !configPanel.actionLevel2"
+          class="w-full h-11 rounded-xl bg-blue-600 text-white font-medium active:bg-blue-700
+                 disabled:opacity-40 disabled:cursor-not-allowed">新增</button>
+      </section>
+
+      <!-- 删除动作 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300">删除动作</h3>
+        <select v-model="configPanel.delActionPlace" @change="configPanel.delAction = ''"
+          class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+          <option value="">选择地点</option>
+          <option v-for="p in places" :key="p" :value="p">{{ p }}</option>
+        </select>
+        <div class="flex gap-2">
+          <select v-model="configPanel.delAction"
+            class="flex-1 h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                   focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            <option value="">选择要删除的动作</option>
+            <option v-for="a in (config[configPanel.delActionPlace] || [])" :key="a.name" :value="a.name">{{ a.name }}</option>
+          </select>
+          <button type="button" @click="deleteAction"
+            class="h-11 px-4 rounded-xl bg-red-600 text-white font-medium active:bg-red-700">删除</button>
+        </div>
+      </section>
+
+      <!-- 退阶设置 -->
+      <section class="space-y-3 pt-2 border-t border-slate-700/60">
+        <h3 class="text-sm font-medium text-slate-300">退阶设置</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="block text-xs text-slate-400">全局退阶比例 (%)</label>
+            <input v-model.number="deloadPercent" type="number" min="0" max="100" step="1"
+              class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          </div>
+          <div class="space-y-1">
+            <label class="block text-xs text-slate-400">重量舍入精度 (kg)</label>
+            <input v-model.number="deloadPrecision" type="number" min="0.5" step="0.5"
+              class="w-full h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          </div>
+        </div>
+        <p class="text-xs text-slate-500">退阶按钮将按比例降重并对齐到舍入精度（适配最小杠铃片规格）</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 动作回顾面板：上次训练 + 历史最佳 -->
+  <div v-if="actionRecordsPanel.open" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/60" @click="closeActionRecords"></div>
+    <div class="relative w-full max-w-md bg-slate-900 border-t sm:border border-slate-700 rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-y-auto p-4 space-y-5">
+      <div class="flex items-center justify-between sticky top-0 bg-slate-900 py-1">
+        <h2 class="text-lg font-semibold text-slate-100">{{ action }} · 训练回顾</h2>
+        <button type="button" @click="closeActionRecords" aria-label="关闭"
+          class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:bg-slate-800 active:bg-slate-700">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+
+      <!-- 上次训练 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300 flex items-center gap-2">
+          <span class="w-1.5 h-4 bg-blue-500 rounded-full"></span>上次训练
+          <span v-if="lastActionInfo" class="text-xs text-slate-500 font-normal">{{ lastActionInfo.hoursAgo }}h 前</span>
+        </h3>
+        <div v-if="lastActionRecord" class="rounded-xl bg-slate-800/60 border border-slate-700 p-3 space-y-2">
+          <p class="text-xs text-slate-400">{{ formatDate(lastActionRecord.date) }}</p>
+          <div class="space-y-1.5">
+            <div v-for="(s, i) in lastActionRecord.sets" :key="'l'+i"
+              class="flex items-center justify-between text-sm">
+              <span class="text-slate-400">第{{ i + 1 }}组</span>
+              <span class="text-slate-100 font-medium tabular-nums">{{ s.weight }} kg × {{ s.reps }} 次</span>
+            </div>
+          </div>
+          <div class="flex justify-between pt-2 border-t border-slate-700/60 text-xs">
+            <span class="text-slate-500">总容量</span>
+            <span class="text-slate-300 font-medium tabular-nums">{{ recordVolume(lastActionRecord) }} kg</span>
+          </div>
+        </div>
+        <p v-else class="text-xs text-slate-500 py-4 text-center">暂无记录</p>
+      </section>
+
+      <!-- 历史最佳 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300 flex items-center gap-2">
+          <span class="w-1.5 h-4 bg-amber-400 rounded-full"></span>历史最佳
+          <span v-if="bestActionRecord" class="text-xs text-amber-400/80 font-normal">最高重量 {{ recordMaxWeight(bestActionRecord) }} kg</span>
+        </h3>
+        <div v-if="bestActionRecord" class="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 space-y-2">
+          <p class="text-xs text-amber-300/80">{{ formatDate(bestActionRecord.date) }}</p>
+          <div class="space-y-1.5">
+            <div v-for="(s, i) in bestActionRecord.sets" :key="'b'+i"
+              class="flex items-center justify-between text-sm">
+              <span class="text-slate-400">第{{ i + 1 }}组</span>
+              <span class="text-slate-100 font-medium tabular-nums">{{ s.weight }} kg × {{ s.reps }} 次</span>
+            </div>
+          </div>
+          <div class="flex justify-between pt-2 border-t border-amber-500/20 text-xs">
+            <span class="text-slate-500">总容量</span>
+            <span class="text-amber-300 font-medium tabular-nums">{{ recordVolume(bestActionRecord) }} kg</span>
+          </div>
+        </div>
+        <p v-else class="text-xs text-slate-500 py-4 text-center">暂无记录</p>
+      </section>
+
+      <!-- 重量趋势图 -->
+      <section class="space-y-3 pt-2 border-t border-slate-700/60">
+        <h3 class="text-sm font-medium text-slate-300 flex items-center gap-2">
+          <span class="w-1.5 h-4 bg-blue-400 rounded-full"></span>重量趋势
+        </h3>
+        <!-- 时间范围选择 -->
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="r in [{k:'1m',t:'近1月'},{k:'3m',t:'近3月'},{k:'all',t:'全部'}]"
+            :key="r.k" type="button" @click="setTrendRange(r.k)"
+            :class="trendRange === r.k
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'"
+            class="h-7 px-2.5 rounded-lg text-xs font-medium transition-colors">
+            {{ r.t }}
+          </button>
+          <button type="button" @click="setTrendRange('custom')"
+            :class="trendRange === 'custom'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'"
+            class="h-7 px-2.5 rounded-lg text-xs font-medium transition-colors">
+            自定义
+          </button>
+        </div>
+        <!-- 自定义日期范围 -->
+        <div v-if="trendRange === 'custom'" class="flex items-center gap-2">
+          <input v-model="trendStartDate" type="date"
+            class="flex-1 h-9 rounded-lg bg-slate-800 border border-slate-700 px-2 text-xs text-slate-100
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <span class="text-slate-500 text-xs">至</span>
+          <input v-model="trendEndDate" type="date"
+            class="flex-1 h-9 rounded-lg bg-slate-800 border border-slate-700 px-2 text-xs text-slate-100
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        </div>
+        <!-- 图表容器 -->
+        <div class="w-full h-48 rounded-xl bg-slate-800/40 border border-slate-700 p-2">
+          <canvas id="trendChartCanvas" style="width:100%;height:100%;display:block"></canvas>
+        </div>
+        <p v-if="trendData.length === 0" class="text-xs text-slate-500 text-center">该时间范围内暂无训练记录</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 历史记录面板 -->
+  <div v-if="historyPanel.open" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/60" @click="closeHistory"></div>
+    <div class="relative w-full max-w-md bg-slate-900 border-t sm:border border-slate-700 rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-y-auto p-4 space-y-4">
+      <div class="flex items-center justify-between sticky top-0 bg-slate-900 py-1">
+        <h2 class="text-lg font-semibold text-slate-100">历史训练数据</h2>
+        <button type="button" @click="closeHistory" aria-label="关闭"
+          class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:bg-slate-800 active:bg-slate-700">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+
+      <div v-if="historyPanel.list.length === 0"
+        class="text-center text-sm text-slate-500 py-12 border border-dashed border-slate-700/70 rounded-xl">
+        暂无历史记录
+      </div>
+
+      <div v-else class="space-y-3">
+        <div v-for="(rec, idx) in historyPanel.list" :key="rec.date + idx"
+          class="rounded-xl bg-slate-800 border border-slate-700/70 p-4 space-y-3">
+          <!-- 顶部：日期时间、地点、动作 + 分类标签 -->
+          <div class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-slate-200">{{ formatDate(rec.date) }}</span>
+            <span class="flex flex-wrap items-center gap-1.5">
+              <span class="text-xs text-slate-400">{{ rec.place }} · {{ rec.action }}</span>
+              <action-badges v-if="rec.actionLevel1" :level1="rec.actionLevel1" :level2="rec.actionLevel2"></action-badges>
+              <template v-if="rec.sleepScore != null"><span class="text-xs text-slate-400">· 睡眠 {{ rec.sleepScore }}分</span></template>
+            </span>
+          </div>
+          <!-- 中部：各组明细 -->
+          <ul class="space-y-1.5">
+            <li v-for="(s, si) in rec.sets" :key="si"
+              class="flex items-center justify-between text-sm">
+              <span class="text-slate-400">第{{ si + 1 }}组</span>
+              <span class="text-slate-200 tabular-nums">{{ s.weight }} kg × {{ s.reps }}</span>
+            </li>
+          </ul>
+          <!-- 底部：总容量 + 删除按钮 -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-700/60">
+            <span class="text-sm text-slate-300">
+              总容量：<span class="font-semibold text-slate-100">{{ rec.totalVolume }} kg</span>
+            </span>
+            <button type="button" @click="deleteHistoryRecord(idx)"
+              class="flex items-center gap-1 h-8 px-3 rounded-lg bg-red-500/10 text-red-400 text-sm
+                     active:bg-red-500/25 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              删除本条
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部通栏：导出 CSV -->
+      <button type="button" @click="exportCSV"
+        class="w-full h-12 rounded-xl bg-green-600 text-white text-base font-semibold
+               active:bg-green-700 transition-colors focus:outline-none focus:ring-2
+               focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-slate-900">
+        导出为 CSV 文件
+      </button>
+    </div>
+  </div>
+
+  <!-- 轻提示 Toast -->
+  <transition name="toast">
+    <div v-if="toast.show"
+      class="fixed top-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-2.5 rounded-full
+             bg-slate-800/95 border border-slate-700 text-sm text-slate-100 shadow-xl">
+      {{ toast.message }}
+    </div>
+  </transition>
+</div>
+
+<script>
+  const { createApp } = Vue
+
+  // ===== PPL 分类常量 =====
+  const LEVEL1_OPTIONS = ['推', '拉', '腿', '心肺与核心']
+  const LEVEL2_OPTIONS = {
+    '推': ['胸部', '肩部前中束', '肱三头肌'],
+    '拉': ['背部', '肩部后束', '肱二头肌与小臂'],
+    '腿': ['股四头肌', '臀部与腘绳肌', '小腿'],
+    '心肺与核心': ['腹部核心', '有氧代谢']
+  }
+  // 一级：实心背景 + 白字；二级：空心边框 + 彩色字
+  const CATEGORY_COLORS = {
+    level1: {
+      '推': 'bg-red-500 text-white',
+      '拉': 'bg-blue-500 text-white',
+      '腿': 'bg-green-500 text-white',
+      '心肺与核心': 'bg-purple-500 text-white'
+    },
+    level2: {
+      '胸部': 'border-pink-400 text-pink-300 bg-pink-500/10',
+      '肩部前中束': 'border-orange-400 text-orange-300 bg-orange-500/10',
+      '肱三头肌': 'border-red-700 text-red-300 bg-red-900/30',
+      '背部': 'border-sky-400 text-sky-300 bg-sky-500/10',
+      '肩部后束': 'border-indigo-400 text-indigo-300 bg-indigo-500/10',
+      '肱二头肌与小臂': 'border-cyan-400 text-cyan-300 bg-cyan-500/10',
+      '股四头肌': 'border-emerald-400 text-emerald-300 bg-emerald-500/10',
+      '臀部与腘绳肌': 'border-amber-400 text-amber-300 bg-amber-500/10',
+      '小腿': 'border-teal-400 text-teal-300 bg-teal-500/10',
+      '腹部核心': 'border-purple-400 text-purple-300 bg-purple-500/10',
+      '有氧代谢': 'border-slate-400 text-slate-300 bg-slate-500/10'
+    }
+  }
+  // 旧版纯字符串动作 → 新对象格式的迁移
+  function migrateAction(a) {
+    if (a == null) return { name: '', level1: '', level2: '' }
+    if (typeof a === 'string') return { name: a, level1: '', level2: '' }
+    if (typeof a === 'object') {
+      return {
+        name: a.name || '',
+        level1: a.level1 || '',
+        level2: a.level2 || ''
+      }
+    }
+    return { name: '', level1: '', level2: '' }
+  }
+  function migrateConfig(cfg) {
+    if (!cfg || typeof cfg !== 'object') return {}
+    const out = {}
+    for (const place in cfg) {
+      out[place] = (Array.isArray(cfg[place]) ? cfg[place] : []).map(migrateAction)
+    }
+    return out
+  }
+
+  // ===== 力量标准：五大项 × 四阶段系数 [新手, 入门, 进阶, 菁英] =====
+  const STANDARDS = [
+    { name: '卧推', coefficients: [0.7, 1.0, 1.35, 1.8] },
+    { name: '深蹲', coefficients: [0.9, 1.3, 1.75, 2.3] },
+    { name: '硬拉', coefficients: [1.05, 1.55, 2.15, 2.7] },
+    { name: '实力推', coefficients: [0.47, 0.68, 0.9, 1.17] },
+    { name: '负重引体向上', coefficients: [1.0, 1.15, 1.4, 1.65] }
+  ]
+  const STAGE_LABELS = ['新手', '入门', '进阶', '菁英']
+
+  // 做组次数 → 1RM 百分比 → 训练目的映射（配重推算用）
+  const REP_PERCENT_TABLE = [
+    { reps: 1, percent: 1.00, purpose: '极限最大力量 (1RM 测试)' },
+    { reps: 3, percent: 0.93, purpose: '神经募集/高强度力量强化' },
+    { reps: 5, percent: 0.87, purpose: '经典力量基础训练 (5x5 核心强度)' },
+    { reps: 6, percent: 0.85, purpose: '力量与肌肥大兼顾' },
+    { reps: 8, percent: 0.80, purpose: '肌肥大主力区间 (黄金增肌次)' },
+    { reps: 10, percent: 0.75, purpose: '肌肥大与耐力容量' },
+    { reps: 12, percent: 0.70, purpose: '泵感与肌耐力训练' }
+  ]
+
+  // 动作分类标签组件：一级实心 + 二级空心
+  const ActionBadges = {
+    props: { level1: String, level2: String },
+    template: `
+      <span v-if="level1" class="inline-flex items-center gap-1 flex-shrink-0">
+        <span :class="l1cls" class="px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none">{{ level1 }}</span>
+        <span v-if="level2" :class="l2cls" class="px-1.5 py-0.5 rounded border text-[10px] font-medium leading-none">{{ level2 }}</span>
+      </span>
+    `,
+    computed: {
+      l1cls() { return CATEGORY_COLORS.level1[this.level1] || 'bg-slate-500 text-white' },
+      l2cls() { return this.level2 ? (CATEGORY_COLORS.level2[this.level2] || 'border-slate-400 text-slate-300 bg-slate-500/10') : '' }
+    }
+  }
+
+  createApp({
+    data() {
+      return {
+        // 配置数据：地点 → 动作列表（动作统一为 {name, level1, level2} 对象）
+        config: {
+          '优机小羊': [
+            { name: '哈克深蹲机', level1: '腿', level2: '股四头肌' },
+            { name: '腿举机', level1: '腿', level2: '股四头肌' },
+            { name: '坐姿腿屈伸', level1: '腿', level2: '股四头肌' }
+          ],
+          '器械区B': [
+            { name: '史密斯机', level1: '推', level2: '胸部' },
+            { name: '哑铃推举凳', level1: '推', level2: '肩部前中束' }
+          ],
+          '自由重量区': [
+            { name: '杠铃深蹲', level1: '腿', level2: '股四头肌' },
+            { name: '哑铃弯举', level1: '拉', level2: '肱二头肌与小臂' }
+          ]
+        },
+        place: '优机小羊',
+        action: '哈克深蹲机',
+        actionDropdownOpen: false,
+        level1Options: LEVEL1_OPTIONS,
+        // 全局 Tab
+        activeTab: 'log',
+        // 力量标准模块：全局当前体重 + 各动作做组输入
+        bodyWeight: 77,
+        strengthInputs: STANDARDS.map(() => ({ weight: null, reps: null })),
+        // 配重推算展开行（-1 表示未展开）
+        expandedRow: -1,
+        // 全部训练历史（响应式，供"上次训练"回显用）
+        allHistory: [],
+        weight: 60,
+        reps: 4,
+        // 组间歇（状态驻留：添加组后不重置）
+        restTimeOptions: ['30s', '1min', '3min', '5min', '自定义'],
+        restTime: '3min',
+        customRestTime: '',
+        sets: [],
+        // 今日睡眠状态
+        sleepTime: '',
+        sleepDuration: null,
+        statusPanelOpen: false,
+        dailyStatus: {},  // { 'YYYY-MM-DD': { bedtime, duration, score } }
+        // 配置管理面板状态
+        configPanel: {
+          open: false,
+          newPlace: '',
+          delPlace: '',
+          addActionPlace: '',
+          newAction: '',
+          actionLevel1: '',
+          actionLevel2: '',
+          delActionPlace: '',
+          delAction: ''
+        },
+        // 轻提示
+        toast: { show: false, message: '' },
+        // 历史记录面板状态
+        historyPanel: {
+          open: false,
+          list: []
+        },
+        // 动作回顾面板（上次训练 + 历史最佳）
+        actionRecordsPanel: {
+          open: false
+        },
+        // 重量趋势图时间范围：预设范围键 + 自定义起止日期
+        trendRange: '1m',           // 1w / 1m / 3m / 6m / all / custom
+        trendStartDate: '',
+        trendEndDate: '',
+        // 补录模式：允许自定义训练日期，补登以前忘记记录的训练
+        backfillMode: false,
+        backfillDate: '',
+        // 退阶（降重）设置：全局退阶比例(%)与重量舍入精度(kg)，持久化到 localStorage
+        deloadPercent: 10,
+        deloadPrecision: 2.5
+      }
+    },
+    created() {
+      // 初始化：优先从 localStorage 读取配置；没有则用默认配置
+      try {
+        const saved = localStorage.getItem('workout_config')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            // 迁移：旧版字符串动作 → 新版对象格式
+            this.config = migrateConfig(parsed)
+          }
+        }
+      } catch (e) { /* 解析失败时回退默认配置 */ }
+      // 兜底：确保当前选中的地点/动作在配置中有效
+      if (!this.config[this.place]) {
+        this.place = Object.keys(this.config)[0] || ''
+      }
+      const list = this.config[this.place] || []
+      this.action = list.length ? list[0].name : ''
+      // 加载每日睡眠状态
+      try {
+        const ds = localStorage.getItem('daily_status')
+        if (ds) this.dailyStatus = JSON.parse(ds) || {}
+      } catch (e) { this.dailyStatus = {} }
+      // 加载训练历史（响应式，供上次训练回显）
+      try {
+        const hist = localStorage.getItem('workout_history')
+        this.allHistory = hist ? (JSON.parse(hist) || []) : []
+      } catch (e) { this.allHistory = [] }
+      // 历史加载完成后，按当前动作回填重量/次数
+      this.applyLastActionValues()
+      // 加载退阶设置
+      try {
+        const ds2 = localStorage.getItem('deload_settings')
+        if (ds2) {
+          const p = JSON.parse(ds2)
+          if (p && typeof p.deloadPercent === 'number') this.deloadPercent = p.deloadPercent
+          if (p && typeof p.deloadPrecision === 'number') this.deloadPrecision = p.deloadPrecision
+        }
+      } catch (e) { /* 使用默认值 */ }
+    },
+    mounted() {
+      // 暴露根实例到 window，便于调试
+      window.__vm__ = this
+    },
+    computed: {
+      places() {
+        return Object.keys(this.config)
+      },
+      actions() {
+        return this.config[this.place] || []
+      },
+      // 当前选中动作的完整对象（含分类）
+      currentActionObj() {
+        return (this.actions || []).find(a => a.name === this.action) || null
+      },
+      // 当前动作的最近一次训练记录（按时间倒序取第一条）
+      lastActionRecord() {
+        if (!this.action) return null
+        const matched = this.allHistory.filter(r => r.action === this.action)
+        if (matched.length === 0) return null
+        return matched.slice().sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+      },
+      // 基于最近记录派生：间隔小时数、颜色、上次重量/次数/组数
+      lastActionInfo() {
+        const rec = this.lastActionRecord
+        if (!rec || !rec.sets || rec.sets.length === 0) return null
+        const hoursAgo = Math.round((Date.now() - new Date(rec.date).getTime()) / 3600000)
+        // 颜色：0~24红、24~48黄、48~72蓝、>72绿（内联色值避免 Tailwind JIT 漏生成）
+        let color = '#4ade80'
+        if (hoursAgo < 24) color = '#f87171'
+        else if (hoursAgo < 48) color = '#facc15'
+        else if (hoursAgo < 72) color = '#60a5fa'
+        const lastSet = rec.sets[rec.sets.length - 1]
+        return {
+          hoursAgo,
+          color,
+          lastWeight: lastSet.weight,
+          lastReps: lastSet.reps,
+          lastSets: rec.sets.length
+        }
+      },
+      // 当前动作的历史最佳记录：单组最大重量最高，并列时取总容量最大
+      bestActionRecord() {
+        if (!this.action) return null
+        const matched = this.allHistory.filter(r => r.action === this.action)
+        if (matched.length === 0) return null
+        return matched.slice().sort((a, b) => {
+          const maxA = Math.max(...(a.sets || []).map(s => Number(s.weight) || 0))
+          const maxB = Math.max(...(b.sets || []).map(s => Number(s.weight) || 0))
+          if (maxB !== maxA) return maxB - maxA
+          const volA = Number(a.totalVolume) || (a.sets || []).reduce((s, x) => s + (Number(x.weight) * Number(x.reps) || 0), 0)
+          const volB = Number(b.totalVolume) || (b.sets || []).reduce((s, x) => s + (Number(x.weight) * Number(x.reps) || 0), 0)
+          return volB - volA
+        })[0]
+      },
+      // 趋势图数据点：当前动作、时间范围内，按日期升序，取每条记录的最大重量
+      trendData() {
+        if (!this.action) return []
+        const { start, end } = this.trendRangeBounds()
+        const pad = n => String(n).padStart(2, '0')
+        return this.allHistory
+          .filter(r => r.action === this.action)
+          .filter(r => {
+            const t = new Date(r.date).getTime()
+            return t >= start && t <= end
+          })
+          .slice()
+          .sort((a, b) => new Date(a.date) - new Date(b.date))
+          .map(r => {
+            const d = new Date(r.date)
+            return {
+              label: `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+              weight: this.recordMaxWeight(r),
+              date: r.date
+            }
+          })
+      },
+      // 配置面板：根据一级分类过滤二级选项
+      actionLevel2Options() {
+        return LEVEL2_OPTIONS[this.configPanel.actionLevel1] || []
+      },
+      // ===== 力量标准模块 =====
+      // 模块一：每行的 1RM / 体重比 / 评级（随 bodyWeight 与输入实时重算）
+      strengthRows() {
+        const bw = Number(this.bodyWeight) || 0
+        return STANDARDS.map((ex, i) => {
+          const input = this.strengthInputs[i] || { weight: null, reps: null }
+          const w = Number(input.weight)
+          const r = Number(input.reps)
+          let oneRM = null
+          const isPullup = ex.name === '负重引体向上'
+          // 杠铃动作需重量>0；负重引体向上允许 0（徒手，仅靠自身体重）
+          if (r > 0 && w >= 0 && (isPullup || w > 0)) {
+            // 负重引体向上：基础总重量 = 自身体重 + 额外挂重
+            const base = isPullup ? bw + w : w
+            oneRM = base * (1 + r / 30)
+          }
+          const ratio = oneRM != null && bw > 0 ? (oneRM / bw).toFixed(2) + 'x' : '--'
+          const rating = this.calcRating(ex, oneRM, bw)
+          return {
+            name: ex.name,
+            weight: input.weight,
+            reps: input.reps,
+            oneRM,
+            oneRMText: oneRM != null ? oneRM.toFixed(1) : '--',
+            ratio,
+            rating
+          }
+        })
+      },
+      // 模块二：力量标准对照表（系数 × 当前体重）
+      standardsMatrix() {
+        const bw = Number(this.bodyWeight) || 0
+        return STANDARDS.map(ex => ({
+          name: ex.name,
+          values: ex.coefficients.map(c => {
+            // 负重引体向上：系数 1.0 即纯自重，其余为超出体重的额外负重
+            if (ex.name === '负重引体向上') {
+              if (Math.abs(c - 1.0) < 1e-6) return '自重'
+              const extra = (c - 1.0) * bw
+              return `+${extra.toFixed(1)}kg`
+            }
+            return (c * bw).toFixed(1) + 'kg'
+          })
+        }))
+      },
+      // 总容量 = 所有组的（重量 × 次数）累加和；数组变化时自动重算
+      totalVolume() {
+        return this.sets.reduce((sum, s) => sum + Number(s.weight) * Number(s.reps), 0)
+      },
+      // 今日日期 key（用于按天存储睡眠状态）
+      todayKey() {
+        const d = new Date()
+        const pad = n => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+      },
+      // 今日日期中文展示：10月8日 星期四
+      todayDateStr() {
+        const d = new Date()
+        const week = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六']
+        return `${d.getMonth()+1}月${d.getDate()}日 ${week[d.getDay()]}`
+      },
+      // 今日睡眠得分（未设置则为 null）
+      todayScore() {
+        const s = this.dailyStatus[this.todayKey]
+        return s ? s.score : null
+      },
+      // 状态徽章的颜色 / 文本
+      scoreInfo() {
+        return this.getScoreInfo(this.todayScore)
+      }
+    },
+    watch: {
+      // 配置任意增删改都写回 localStorage，下次打开自动恢复
+      config: {
+        deep: true,
+        handler(val) {
+          try { localStorage.setItem('workout_config', JSON.stringify(val)) } catch (e) {}
+        }
+      },
+      // 退阶设置持久化
+      deloadPercent(val) {
+        try { localStorage.setItem('deload_settings', JSON.stringify({ deloadPercent: val, deloadPrecision: this.deloadPrecision })) } catch (e) {}
+      },
+      deloadPrecision(val) {
+        try { localStorage.setItem('deload_settings', JSON.stringify({ deloadPercent: this.deloadPercent, deloadPrecision: val })) } catch (e) {}
+      },
+      // 趋势图时间范围变化时重渲染
+      trendRange() { if (this.actionRecordsPanel.open) this.renderTrendChart() },
+      trendStartDate() { if (this.actionRecordsPanel.open && this.trendRange === 'custom') this.renderTrendChart() },
+      trendEndDate() { if (this.actionRecordsPanel.open && this.trendRange === 'custom') this.renderTrendChart() },
+      // 地点切换时，清空动作选择并重置为该地点第一个动作（联动）
+      place(newVal) {
+        const list = this.config[newVal] || []
+        this.action = list.length ? list[0].name : ''
+      },
+      // 切换动作时，自动回填上次训练的重量与次数
+      action() {
+        this.applyLastActionValues()
+      }
+    },
+    methods: {
+      // 根据当前动作的最近训练记录回填重量/次数
+      applyLastActionValues() {
+        const info = this.lastActionInfo
+        if (info) {
+          if (info.lastWeight != null) this.weight = info.lastWeight
+          if (info.lastReps != null) this.reps = info.lastReps
+        } else {
+          this.weight = 60
+          this.reps = 4
+        }
+      },
+      // ===== 今日睡眠状态评分 =====
+      // 根据得分返回徽章颜色 / 文本 / 圆点色
+      getScoreInfo(score) {
+        if (score == null) {
+          return {
+            cls: 'bg-slate-700/60 text-slate-300 border-slate-600',
+            dot: '#94a3b8',
+            text: '状态：未设置'
+          }
+        }
+        let label, cls, dot
+        if (score >= 4.5)      { label = '极佳'; cls = 'bg-green-500/15 text-green-300 border-green-500/40'; dot = '#4ade80' }
+        else if (score >= 3.5) { label = '良好'; cls = 'bg-blue-500/15 text-blue-300 border-blue-500/40'; dot = '#60a5fa' }
+        else if (score >= 2.5) { label = '一般'; cls = 'bg-yellow-500/15 text-yellow-300 border-yellow-500/40'; dot = '#facc15' }
+        else if (score >= 1.5) { label = '疲劳'; cls = 'bg-orange-500/15 text-orange-300 border-orange-500/40'; dot = '#fb923c' }
+        else                   { label = '不宜大容量训练'; cls = 'bg-red-500/15 text-red-300 border-red-500/40'; dot = '#f87171' }
+        return { cls, dot, text: `状态：${label} (${score}分)` }
+      },
+      // 核心计算：基础分（时长）- 熬夜扣分（入睡时段），约束在 1~5 分
+      calcSleepScore(duration, bedtime) {
+        const h = Number(duration)
+        if (!bedtime || isNaN(h) || h <= 0) return null
+        const [hh, mm] = bedtime.split(':').map(Number)
+        if (isNaN(hh) || isNaN(mm)) return null
+        const t = hh + mm / 60  // 24 小时制浮点数
+
+        // 步骤一：基础分
+        let base
+        if (h >= 7.5) base = 5
+        else if (h >= 6.5) base = 4
+        else if (h >= 5.5) base = 3
+        else if (h >= 4.5) base = 2
+        else base = 1
+
+        // 步骤二：熬夜扣分（t>=12 视为 24:00 前入睡，不扣分）
+        let deduction
+        if (t >= 12) deduction = 0          // 24:00 前入睡
+        else if (t >= 2) deduction = 1.5    // 2:00 及以后
+        else if (t >= 1) deduction = 1.0    // 1:00 - 1:59
+        else deduction = 0.5                // 0:00 - 0:59
+
+        // 步骤三：最终得分，约束 1~5，保留一位小数
+        let score = base - deduction
+        score = Math.max(1, Math.min(5, score))
+        return Math.round(score * 10) / 10
+      },
+      computeStatus() {
+        const score = this.calcSleepScore(this.sleepDuration, this.sleepTime)
+        if (score == null) {
+          this.showToast('请填写入睡时间和睡眠时长')
+          return
+        }
+        this.dailyStatus[this.todayKey] = {
+          bedtime: this.sleepTime,
+          duration: Number(this.sleepDuration),
+          score
+        }
+        try { localStorage.setItem('daily_status', JSON.stringify(this.dailyStatus)) } catch (e) {}
+        this.statusPanelOpen = false
+        this.showToast(`状态已更新：${score}分`)
+      },
+      // ===== 力量标准评级：30% 过渡算法 =====
+      calcRating(ex, oneRM, bw) {
+        if (oneRM == null || bw <= 0) return { text: '待输入', highlight: false }
+        const nodes = ex.coefficients.map(c => c * bw)
+        if (oneRM < nodes[0]) return { text: '未入门', highlight: false }
+        if (oneRM >= nodes[3]) return { text: '菁英及以上', highlight: false }
+        // 定位所在区间 [nodes[i], nodes[i+1])
+        let i = 0
+        for (; i < 3; i++) {
+          if (oneRM < nodes[i + 1]) break
+        }
+        const span = nodes[i + 1] - nodes[i]
+        const progress = span > 0 ? (oneRM - nodes[i]) / span : 0
+        const stage = STAGE_LABELS[i]
+        const next = STAGE_LABELS[i + 1]
+        if (progress < 0.3) return { text: `${stage} (稳固区)`, highlight: false }
+        if (progress < 0.7) return { text: `${stage} ➔ ${next} (爬升区)`, highlight: false }
+        return { text: `准${next} (突破区)`, highlight: true }
+      },
+      // 配重推算：将 1RM 按百分比传导到做组重量，吸附到 2.5kg 倍数
+      calcPrescription(name, oneRM, bw) {
+        if (oneRM == null || bw <= 0) return []
+        const isPullup = name === '负重引体向上'
+        return REP_PERCENT_TABLE.map(item => {
+          const theoretical = oneRM * item.percent
+          // 负重引体：推荐额外挂重 = 总理论重量 - 自身体重
+          const raw = isPullup ? theoretical - bw : theoretical
+          const snapped = Math.round(raw / 2.5) * 2.5
+          const rec = snapped <= 0
+            ? '徒手或降阶器械'
+            : snapped.toFixed(1) + 'kg'
+          return {
+            reps: item.reps,
+            percentText: Math.round(item.percent * 100) + '%',
+            purpose: item.purpose,
+            rec
+          }
+        })
+      },
+      addGroup() {
+        const w = Number(this.weight)
+        const r = Number(this.reps)
+        if (!w || w <= 0 || !r || r <= 0) return
+        // 间歇取值：自定义时取自定义文本，否则取预设值
+        const rt = this.restTime === '自定义'
+          ? (this.customRestTime.trim() || '自定义')
+          : this.restTime
+        this.sets.push({ weight: w, reps: r, restTime: rt })
+        // 关键：不重置 restTime / customRestTime，保持状态驻留
+      },
+      removeSet(index) {
+        this.sets.splice(index, 1)
+      },
+      // ===== 配置管理（地点 / 动作 CRUD） =====
+      openConfig() { this.configPanel.open = true },
+      closeConfig() { this.configPanel.open = false },
+      addPlace() {
+        const name = this.configPanel.newPlace.trim()
+        if (!name || this.config[name]) return
+        this.config[name] = []
+        this.configPanel.newPlace = ''
+      },
+      deletePlace() {
+        const name = this.configPanel.delPlace
+        if (!name || !this.config[name]) return
+        delete this.config[name]
+        // 若删除的是当前选中地点，自动切到剩余第一个
+        if (this.place === name) {
+          this.place = this.places[0] || ''
+        }
+        this.configPanel.delPlace = ''
+      },
+      addAction() {
+        const place = this.configPanel.addActionPlace
+        const name = this.configPanel.newAction.trim()
+        const l1 = this.configPanel.actionLevel1
+        const l2 = this.configPanel.actionLevel2
+        // 名称、一级、二级都必填
+        if (!place || !name || !l1 || !l2 || !this.config[place]) return
+        if (this.config[place].some(a => a.name === name)) return
+        this.config[place].push({ name, level1: l1, level2: l2 })
+        this.configPanel.newAction = ''
+        this.configPanel.actionLevel1 = ''
+        this.configPanel.actionLevel2 = ''
+      },
+      deleteAction() {
+        const place = this.configPanel.delActionPlace
+        const name = this.configPanel.delAction
+        if (!place || !name || !this.config[place]) return
+        this.config[place] = this.config[place].filter(a => a.name !== name)
+        // 若删除的是当前选中动作，自动切到该地点剩余第一个
+        if (this.place === place && this.action === name) {
+          this.action = (this.config[place][0] || {}).name || ''
+        }
+        this.configPanel.delAction = ''
+      },
+      // ===== 保存训练记录 =====
+      confirm() {
+        if (this.sets.length === 0) {
+          this.showToast('请先添加训练组')
+          return
+        }
+        // 补录模式使用用户自定义的日期时间；普通模式用当前时间
+        const recordDate = this.backfillMode && this.backfillDate
+          ? new Date(this.backfillDate).toISOString()
+          : new Date().toISOString()
+        const record = {
+          date: recordDate,
+          place: this.place,
+          action: this.action,
+          sets: this.sets.map(s => ({ weight: s.weight, reps: s.reps, restTime: s.restTime || '' })),
+          totalVolume: this.totalVolume,
+          // 补录历史训练时，当日睡眠评分无意义，置空
+          sleepScore: this.backfillMode ? null : this.todayScore,
+          actionLevel1: (this.currentActionObj || {}).level1 || '',
+          actionLevel2: (this.currentActionObj || {}).level2 || ''
+        }
+        try {
+          const history = JSON.parse(localStorage.getItem('workout_history') || '[]')
+          history.push(record)
+          localStorage.setItem('workout_history', JSON.stringify(history))
+          this.allHistory = history
+        } catch (e) {
+          this.showToast('保存失败')
+          return
+        }
+        // 重置为待输入状态：清空组数、恢复重量/次数初始值
+        // 注意：restTime / customRestTime 保持不变，实现状态驻留
+        this.sets = []
+        this.weight = 60
+        this.reps = 4
+        this.showToast('记录保存成功')
+      },
+      cancel() {},
+      // 轻提示：2 秒后自动消失
+      showToast(message) {
+        this.toast.message = message
+        this.toast.show = true
+        clearTimeout(this._toastTimer)
+        this._toastTimer = setTimeout(() => { this.toast.show = false }, 2000)
+      },
+      // 返回当前本地时间，格式化为 datetime-local 所需的 YYYY-MM-DDTHH:mm
+      nowLocalInput() {
+        const d = new Date()
+        const pad = n => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      },
+      // 切换补录模式：开启时默认填充当前时间
+      toggleBackfill() {
+        this.backfillMode = !this.backfillMode
+        if (this.backfillMode && !this.backfillDate) {
+          this.backfillDate = this.nowLocalInput()
+        }
+      },
+      // 重量快速加重按钮
+      addWeight(delta) {
+        const cur = Number(this.weight) || 0
+        this.weight = Math.round((cur + delta) * 10) / 10
+      },
+      // 退阶：按全局比例降重并对齐到舍入精度，不聚焦输入框（防止手机端弹软键盘）
+      applyDeload() {
+        // 抓取基数：优先当前输入框值；为空则取上次训练重量
+        let base = Number(this.weight)
+        if (!base || isNaN(base)) {
+          base = this.lastActionInfo ? Number(this.lastActionInfo.lastWeight) : 0
+        }
+        // 比例折算
+        const ratio = Math.max(0, Math.min(100, Number(this.deloadPercent) || 0))
+        const theoretical = base * (1 - ratio / 100)
+        // 动态步进吸附
+        const precision = Math.max(0.1, Number(this.deloadPrecision) || 2.5)
+        let final = Math.round(theoretical / precision) * precision
+        // 极值保护
+        if (final <= 0) final = 0
+        // 写入输入框（v-model 双向绑定自动更新 DOM），不 focus
+        this.weight = Math.round(final * 10) / 10
+      },
+      // ===== 历史记录 =====
+      openHistory() {
+        this.loadHistory()
+        this.historyPanel.open = true
+      },
+      closeHistory() { this.historyPanel.open = false },
+      // ===== 动作回顾面板（上次训练 + 历史最佳）=====
+      openActionRecords() {
+        this.actionRecordsPanel.open = true
+        this.renderTrendChart()
+      },
+      closeActionRecords() {
+        this.actionRecordsPanel.open = false
+        if (this.trendChart) {
+          this.trendChart.destroy()
+          this.trendChart = null
+        }
+      },
+      // 切换趋势时间范围
+      setTrendRange(range) {
+        this.trendRange = range
+      },
+      // 计算单条记录的总容量
+      recordVolume(rec) {
+        if (!rec) return 0
+        if (rec.totalVolume != null) return Number(rec.totalVolume) || 0
+        return (rec.sets || []).reduce((s, x) => s + (Number(x.weight) * Number(x.reps) || 0), 0)
+      },
+      // 计算单条记录的最大单组重量
+      recordMaxWeight(rec) {
+        if (!rec || !rec.sets) return 0
+        return Math.max(...rec.sets.map(s => Number(s.weight) || 0))
+      },
+      // 计算时间范围起止时间戳
+      trendRangeBounds() {
+        const now = Date.now()
+        const day = 86400000
+        let start = 0
+        if (this.trendRange === '1w') start = now - 7 * day
+        else if (this.trendRange === '1m') start = now - 30 * day
+        else if (this.trendRange === '3m') start = now - 90 * day
+        else if (this.trendRange === '6m') start = now - 180 * day
+        else if (this.trendRange === 'all') start = 0
+        else if (this.trendRange === 'custom') {
+          start = this.trendStartDate ? new Date(this.trendStartDate + 'T00:00:00').getTime() : 0
+          const end = this.trendEndDate ? new Date(this.trendEndDate + 'T23:59:59').getTime() : now
+          return { start, end }
+        }
+        return { start, end: now }
+      },
+      // 渲染折线图：创建一次后仅更新数据，避免 destroy/recreate 同一 canvas 引发的内部状态损坏
+      renderTrendChart() {
+        this.$nextTick(() => {
+          const tryRender = (attempt) => {
+            const canvas = document.getElementById('trendChartCanvas')
+            if (!canvas) return
+            // 等待 canvas 获得真实尺寸后再操作
+            if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+              if (attempt < 20) setTimeout(() => tryRender(attempt + 1), 30)
+              return
+            }
+            const data = this.trendData
+            if (this.trendChart) {
+              // 已有实例：仅更新数据，不销毁重建
+              this.trendChart.data.labels = data.map(p => p.label)
+              this.trendChart.data.datasets[0].data = data.map(p => p.weight)
+              this.trendChart.update('none')
+            } else {
+              // 首次创建：显式设置画布像素尺寸（responsive:false）
+              canvas.width = canvas.clientWidth
+              canvas.height = canvas.clientHeight
+              const ctx = canvas.getContext('2d')
+              const grad = ctx.createLinearGradient(0, 0, 0, canvas.height)
+              grad.addColorStop(0, 'rgba(96, 165, 250, 0.35)')
+              grad.addColorStop(1, 'rgba(96, 165, 250, 0.0)')
+              this.trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                  labels: data.map(p => p.label),
+                  datasets: [{
+                    label: '最大重量 (kg)',
+                    data: data.map(p => p.weight),
+                    borderColor: '#60a5fa',
+                    backgroundColor: grad,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#60a5fa',
+                    pointBorderColor: '#1e293b',
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.3,
+                    fill: true
+                  }]
+                },
+                options: {
+                  responsive: false,
+                  maintainAspectRatio: false,
+                  animation: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: ctx => `${ctx.parsed.y} kg`
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 0 },
+                      grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                    },
+                    y: {
+                      title: { display: true, text: '重量 (kg)', color: '#94a3b8' },
+                      ticks: { color: '#94a3b8' },
+                      grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                      beginAtZero: false
+                    }
+                  }
+                }
+              })
+            }
+          }
+          // 等待两帧确保布局完全稳定后再创建图表
+          requestAnimationFrame(() => requestAnimationFrame(() => tryRender(0)))
+        })
+      },
+      loadHistory() {
+        try {
+          const raw = localStorage.getItem('workout_history') || '[]'
+          const arr = JSON.parse(raw)
+          // 按时间倒序：最新在最上方
+          this.historyPanel.list = Array.isArray(arr)
+            ? arr.slice().sort((a, b) => new Date(b.date) - new Date(a.date))
+            : []
+        } catch (e) {
+          this.historyPanel.list = []
+        }
+      },
+      deleteHistoryRecord(index) {
+        // index 是倒序列表中的位置，需还原为原数组中的下标后再删除
+        try {
+          const raw = localStorage.getItem('workout_history') || '[]'
+          const arr = JSON.parse(raw)
+          if (!Array.isArray(arr)) return
+          // 按相同倒序规则找到对应原始记录
+          const sorted = arr.slice().sort((a, b) => new Date(b.date) - new Date(a.date))
+          const target = sorted[index]
+          const realIndex = arr.indexOf(target)
+          if (realIndex > -1) {
+            arr.splice(realIndex, 1)
+            localStorage.setItem('workout_history', JSON.stringify(arr))
+            this.allHistory = arr
+          }
+        } catch (e) {}
+        // 重新加载并刷新面板
+        this.loadHistory()
+      },
+      // 日期时间格式化（YYYY-MM-DD HH:mm）
+      formatDate(iso) {
+        if (!iso) return ''
+        const d = new Date(iso)
+        if (isNaN(d.getTime())) return iso
+        const pad = n => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+      },
+      // ===== 导出 CSV =====
+      exportCSV() {
+        let history = []
+        try {
+          history = JSON.parse(localStorage.getItem('workout_history') || '[]')
+          if (!Array.isArray(history)) history = []
+        } catch (e) { history = [] }
+
+        const header = ['日期', '地点', '动作', '组数序号', '重量(kg)', '次数', '单组容量(kg)', '组间歇', '睡眠得分']
+        const rows = []
+        history.forEach(rec => {
+          const sets = Array.isArray(rec.sets) ? rec.sets : []
+          sets.forEach((s, i) => {
+            const volume = Number(s.weight) * Number(s.reps)
+            rows.push([
+              this.formatDate(rec.date),
+              rec.place,
+              rec.action,
+              i + 1,
+              s.weight,
+              s.reps,
+              volume,
+              s.restTime || '',
+              rec.sleepScore != null ? rec.sleepScore : ''
+            ])
+          })
+        })
+
+        // CSV 字段转义：统一加双引号，内部双引号翻倍
+        const escape = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'
+        const csvLines = [header, ...rows].map(r => r.map(escape).join(','))
+        // BOM 头解决 Excel/WPS 中文乱码
+        const csv = '\ufeff' + csvLines.join('\n')
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+
+        const pad = n => String(n).padStart(2, '0')
+        const now = new Date()
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+        const fileName = `训练记录_${stamp}.csv`
+
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+
+        this.showToast(history.length ? 'CSV 导出成功' : '暂无数据可导出')
+      }
+    }
+  }).component('action-badges', ActionBadges).mount('#app')
+
+  // 注册 Service Worker（file:// 打开时跳过，需通过 http(s) 访问）
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js?v=36').catch(() => {})
+    })
+  }
+</script>
+</body>
+</html>

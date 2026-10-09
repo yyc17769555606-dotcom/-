@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- maskable 图标：内容收敛在中心 80% 安全区内，铺满背景 -->
+  <rect width="512" height="512" fill="#0f172a"/>
+  <g fill="none" stroke="#3b82f6" stroke-width="28" stroke-linecap="round">
+    <line x1="170" y1="256" x2="342" y2="256"/>
+  </g>
+  <g fill="#3b82f6">
+    <rect x="120" y="216" width="32" height="80" rx="10"/>
+    <rect x="162" y="192" width="24" height="128" rx="10" fill="#60a5fa"/>
+    <rect x="326" y="192" width="24" height="128" rx="10" fill="#60a5fa"/>
+    <rect x="360" y="216" width="32" height="80" rx="10"/>
+  </g>
+</svg>
