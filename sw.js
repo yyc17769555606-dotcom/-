@@ -1,5 +1,5 @@
 /* 基础离线缓存：预缓存本地资源，CDN 资源运行时缓存 */
-const CACHE = 'train-log-v36';
+const CACHE = 'train-log-v43';
 const LOCAL_ASSETS = [
   './',
   './index.html',

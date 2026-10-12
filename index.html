@@ -69,6 +69,17 @@
           <path d="M12 7v5l4 2" />
         </svg>
       </button>
+      <button type="button" @click="openWorkingWeights" aria-label="基准力量"
+        class="flex items-center justify-center w-10 h-10 rounded-lg text-slate-300
+               hover:bg-slate-800 active:bg-slate-700 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6.5 6.5h11" />
+          <path d="M3 12h18" />
+          <path d="M6.5 17.5h11" />
+          <path d="M5 4v16" />
+          <path d="M19 4v16" />
+        </svg>
+      </button>
       <button type="button" @click="openConfig" aria-label="配置管理"
         class="flex items-center justify-center w-10 h-10 rounded-lg text-slate-300
                hover:bg-slate-800 active:bg-slate-700 transition-colors">
@@ -80,7 +91,7 @@
     </div>
   </header>
 
-  <!-- Tab 导航：训练记录 / 力量标准 -->
+  <!-- Tab 导航：训练记录 / 力量标准 / 个人计划 -->
   <nav class="flex shrink-0 border-b border-slate-800">
     <button type="button" @click="activeTab = 'log'"
       :class="activeTab === 'log' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-400 border-b-2 border-transparent'"
@@ -88,6 +99,9 @@
     <button type="button" @click="activeTab = 'standards'"
       :class="activeTab === 'standards' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-400 border-b-2 border-transparent'"
       class="flex-1 h-11 text-sm font-medium transition-colors">力量标准</button>
+    <button type="button" @click="activeTab = 'plan'"
+      :class="activeTab === 'plan' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-400 border-b-2 border-transparent'"
+      class="flex-1 h-11 text-sm font-medium transition-colors">个人计划</button>
   </nav>
 
   <!-- ============ 训练记录页面 ============ -->
@@ -257,6 +271,19 @@
                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
     </div>
 
+    <!-- 热身组标记开关：开启后下一组记为热身组 -->
+    <div class="flex items-center justify-between rounded-xl bg-slate-800/60 border border-slate-700 px-4 py-3">
+      <button type="button" @click="warmup = !warmup" class="flex items-center gap-3 min-w-0">
+        <span class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          :class="warmup ? 'bg-orange-500' : 'bg-slate-600'">
+          <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+            :class="warmup ? 'translate-x-6' : 'translate-x-1'"></span>
+        </span>
+        <span class="text-sm font-medium text-slate-200">标记为热身组</span>
+      </button>
+      <span v-if="warmup" class="text-xs text-orange-300">下一组为热身</span>
+    </div>
+
     <!-- 添加此组 -->
     <button type="button" @click="addGroup"
       class="w-full h-12 rounded-xl bg-blue-600 text-white text-base font-semibold
@@ -286,10 +313,18 @@
           还没有添加训练组
         </li>
         <li v-for="(s, index) in sets" :key="index"
-          class="flex items-center justify-between rounded-xl bg-slate-800 border border-slate-700/70 px-4 h-12">
-          <span class="text-sm text-slate-400">第{{ index + 1 }}组</span>
+          class="flex items-center justify-between rounded-xl border px-4 h-12"
+          :class="s.warmup
+            ? 'bg-orange-500/5 border-orange-500/20'
+            : 'bg-slate-800 border-slate-700/70'">
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-400">第{{ index + 1 }}组</span>
+            <span v-if="s.warmup"
+              class="px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none bg-orange-500/20 text-orange-300 border border-orange-500/30">热身</span>
+          </div>
           <div class="flex items-center gap-3">
-            <span class="text-sm font-medium text-slate-100 tabular-nums">{{ s.weight }} kg × {{ s.reps }} <span v-if="s.restTime" class="text-slate-400 font-normal">(间歇: {{ s.restTime }})</span></span>
+            <span class="text-sm font-medium tabular-nums"
+              :class="s.warmup ? 'text-slate-500' : 'text-slate-100'">{{ s.weight }} kg × {{ s.reps }} <span v-if="s.restTime" class="text-slate-400 font-normal">(间歇: {{ s.restTime }})</span></span>
             <button type="button" @click="removeSet(index)" aria-label="删除该组"
               class="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 text-red-400
                      active:bg-red-500/25 transition-colors focus:outline-none focus:ring-2
@@ -305,27 +340,15 @@
         </li>
       </ul>
     </section>
-  </main>
 
-  <!-- 底部固定操作栏：通栏双按钮 + iPhone 底部安全区留白 -->
-  <footer
-    class="shrink-0 border-t border-slate-800 bg-slate-900/95 backdrop-blur px-4 pt-3 pb-3"
-    style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));">
-    <div class="grid grid-cols-2 gap-4">
-      <button type="button" @click="confirm"
-        :class="backfillMode
-          ? 'h-12 rounded-xl bg-amber-600 text-white text-base font-semibold active:bg-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900'
-          : 'h-12 rounded-xl bg-blue-600 text-white text-base font-semibold active:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900'">
-        {{ backfillMode ? '补录确认' : '确认' }}
-      </button>
-      <button type="button" @click="cancel"
-        class="h-12 rounded-xl bg-slate-700 text-slate-100 text-base font-semibold
-               active:bg-slate-600 transition-colors focus:outline-none focus:ring-2
-               focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900">
-        取消
-      </button>
-    </div>
-  </footer>
+    <!-- 训练完成按钮：随内容滚动，位于列表最下方 -->
+    <button type="button" @click="confirm"
+      :class="backfillMode
+        ? 'w-full h-12 rounded-xl bg-amber-600 text-white text-base font-semibold active:bg-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900'
+        : 'w-full h-12 rounded-xl bg-[#eb5f24] text-white text-base font-semibold active:bg-[#c94d1a] transition-colors focus:outline-none focus:ring-2 focus:ring-[#eb5f24] focus:ring-offset-2 focus:ring-offset-slate-900'">
+      {{ backfillMode ? '补录确认' : '训练完成' }}
+    </button>
+  </main>
   </template>
 
   <!-- ============ 力量标准页面 ============ -->
@@ -435,6 +458,176 @@
     </section>
   </main>
   </template>
+
+  <!-- ============ 个人计划页面（日历） ============ -->
+  <template v-if="activeTab === 'plan'">
+  <!-- 月份切换栏 -->
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
+    <button type="button" @click="prevMonth" aria-label="上一月"
+      class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+    </button>
+    <div class="flex items-center gap-2">
+      <span class="text-base font-semibold text-slate-100">{{ planMonthLabel }}</span>
+      <button type="button" @click="goToday"
+        class="h-7 px-2.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700 transition-colors">今天</button>
+      <button type="button" @click="openTemplatePanel"
+        class="h-7 px-2.5 rounded-lg bg-blue-600/20 text-blue-300 text-xs font-medium hover:bg-blue-600/30 transition-colors border border-blue-500/30">周模板</button>
+    </div>
+    <button type="button" @click="nextMonth" aria-label="下一月"
+      class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+    </button>
+  </div>
+
+  <main class="flex-1 overflow-y-auto px-3 pt-3 pb-6">
+    <!-- 星期表头 -->
+    <div class="grid grid-cols-7 gap-1 mb-1">
+      <div v-for="w in ['日','一','二','三','四','五','六']" :key="w"
+        class="text-center text-xs font-medium text-slate-500 py-1">{{ w }}</div>
+    </div>
+    <!-- 日期网格 -->
+    <div class="grid grid-cols-7 gap-1">
+      <button v-for="cell in calendarDays" :key="cell.date" type="button"
+        @click="openPlanPanel(cell.date)"
+        class="relative flex flex-col items-center justify-start rounded-lg border transition-colors min-h-[64px] py-1"
+        :class="[
+          cell.inMonth ? 'bg-slate-800/40 border-slate-700/60' : 'bg-slate-800/10 border-slate-800/40',
+          cell.isToday ? 'ring-2 ring-blue-500' : '',
+          'hover:bg-slate-700/40'
+        ]">
+        <span class="text-xs tabular-nums"
+          :class="[cell.inMonth ? 'text-slate-200' : 'text-slate-600', cell.isToday ? 'text-blue-400 font-semibold' : '']">
+          {{ cell.day }}
+        </span>
+        <!-- 计划标记：有计划时显示圆点 + 动作数 -->
+        <div v-if="plansByDate[cell.date]" class="flex flex-col items-center gap-0.5 mt-0.5 w-full px-1">
+          <span class="flex items-center gap-0.5">
+            <span class="w-1.5 h-1.5 rounded-full"
+              :class="plansByDate[cell.date].every(p => p.completed) ? 'bg-green-400' : 'bg-orange-400'"></span>
+            <span class="text-[10px] text-slate-400">{{ plansByDate[cell.date].length }}项</span>
+          </span>
+          <!-- 最多显示 2 个动作名 -->
+          <span v-for="(p, i) in plansByDate[cell.date].slice(0, 2)" :key="p.id"
+            class="text-[10px] truncate w-full text-center"
+            :class="p.completed ? 'line-through text-slate-600' : 'text-slate-400'">
+            {{ p.action }}
+          </span>
+          <span v-if="plansByDate[cell.date].length > 2" class="text-[10px] text-slate-500">+{{ plansByDate[cell.date].length - 2 }}</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- 图例 -->
+    <div class="flex items-center justify-center gap-4 mt-4 text-xs text-slate-500">
+      <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-orange-400"></span>待完成</span>
+      <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>已完成</span>
+      <span class="flex items-center gap-1"><span class="w-4 h-4 rounded border-2 border-blue-500"></span>今天</span>
+    </div>
+  </main>
+  </template>
+
+  <!-- 计划详情弹层（当天计划列表 + 添加表单） -->
+  <div v-if="planPanel.open" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/60" @click="closePlanPanel"></div>
+    <div class="relative w-full max-w-md bg-slate-900 border-t sm:border border-slate-700 rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-y-auto p-4 space-y-4">
+      <div class="flex items-center justify-between sticky top-0 bg-slate-900 py-1">
+        <h2 class="text-lg font-semibold text-slate-100">{{ planPanelDateLabel() }}</h2>
+        <button type="button" @click="closePlanPanel" aria-label="关闭"
+          class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:bg-slate-800 active:bg-slate-700">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+
+      <!-- 当天计划列表 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300">训练计划</h3>
+        <div v-if="planPanelItems.length === 0"
+          class="text-center text-sm text-slate-500 py-6 border border-dashed border-slate-700/70 rounded-xl">
+          暂无计划，点击下方添加
+        </div>
+        <div v-else class="space-y-2">
+          <div v-for="p in planPanelItems" :key="p.id"
+            class="rounded-xl bg-slate-800 border border-slate-700/70 p-3 space-y-1.5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <button type="button" @click="togglePlanComplete(p.id)"
+                  class="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors"
+                  :class="p.completed ? 'bg-green-500 border-green-500' : 'border-slate-500'">
+                  <svg v-if="p.completed" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                </button>
+                <span class="text-sm font-medium truncate" :class="p.completed ? 'line-through text-slate-500' : 'text-slate-100'">{{ p.action }}</span>
+                <action-badges v-if="p.level1" :level1="p.level1" :level2="p.level2"></action-badges>
+              </div>
+              <button type="button" @click="deletePlan(p.id)" aria-label="删除"
+                class="flex-shrink-0 w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/25 transition-colors flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+              </button>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-slate-400 pl-7">
+              <span v-if="p.weight != null">{{ p.weight }} kg</span>
+              <span v-if="p.reps != null">{{ p.reps }} 次</span>
+              <span v-if="p.sets">× {{ p.sets }} 组</span>
+              <span v-if="p.note" class="text-slate-500 truncate">· {{ p.note }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 添加计划表单 -->
+      <section class="space-y-3 pt-2 border-t border-slate-700/60">
+        <h3 class="text-sm font-medium text-slate-300">添加计划</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="block text-xs text-slate-400">地点</label>
+            <select v-model="planPanel.form.place" @change="onPlanPlaceChange"
+              class="w-full h-10 rounded-lg bg-slate-800 border border-slate-700 px-2 text-slate-100 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option v-for="pl in places" :key="pl" :value="pl">{{ pl }}</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label class="block text-xs text-slate-400">动作</label>
+            <select v-model="planPanel.form.action"
+              class="w-full h-10 rounded-lg bg-slate-800 border border-slate-700 px-2 text-slate-100 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option v-for="a in (config[planPanel.form.place] || [])" :key="a.name" :value="a.name">{{ a.name }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="space-y-1">
+            <label class="block text-xs text-slate-400">重量(kg)</label>
+            <input v-model.number="planPanel.form.weight" type="number" step="0.5" min="0"
+              class="w-full h-10 rounded-lg bg-slate-800 border border-slate-700 px-2 text-slate-100 text-sm tabular-nums
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          </div>
+          <div class="space-y-1">
+            <label class="block text-xs text-slate-400">次数</label>
+            <input v-model.number="planPanel.form.reps" type="number" step="1" min="0"
+              class="w-full h-10 rounded-lg bg-slate-800 border border-slate-700 px-2 text-slate-100 text-sm tabular-nums
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          </div>
+          <div class="space-y-1">
+            <label class="block text-xs text-slate-400">组数</label>
+            <input v-model.number="planPanel.form.sets" type="number" step="1" min="1"
+              class="w-full h-10 rounded-lg bg-slate-800 border border-slate-700 px-2 text-slate-100 text-sm tabular-nums
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          </div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs text-slate-400">备注</label>
+          <input v-model="planPanel.form.note" type="text" placeholder="可选"
+            class="w-full h-10 rounded-lg bg-slate-800 border border-slate-700 px-2 text-slate-100 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        </div>
+        <button type="button" @click="addPlan"
+          class="w-full h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold active:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900">
+          添加到该日期
+        </button>
+      </section>
+    </div>
+  </div>
 
   <!-- 配置管理弹层 -->
   <div v-if="configPanel.open" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -551,6 +744,85 @@
     </div>
   </div>
 
+  <!-- 基准力量面板：动作基准重量增删改查 -->
+  <div v-if="workingWeightsPanel.open" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/60" @click="closeWorkingWeights"></div>
+    <div class="relative w-full max-w-md bg-slate-900 border-t sm:border border-slate-700 rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-y-auto p-4 space-y-4">
+      <div class="flex items-center justify-between sticky top-0 bg-slate-900 py-1">
+        <h2 class="text-lg font-semibold text-slate-100">基准力量</h2>
+        <button type="button" @click="closeWorkingWeights" aria-label="关闭"
+          class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:bg-slate-800 active:bg-slate-700">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+
+      <!-- 添加动作区 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-slate-300">添加动作到基准表</h3>
+        <div class="flex gap-2">
+          <select v-model="workingWeightsPanel.addAction"
+            class="flex-1 h-11 rounded-xl bg-slate-800 border border-slate-700 px-3 text-slate-100
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <option value="">选择动作</option>
+            <option v-for="a in allActions" :key="a.name" :value="a.name">{{ a.name }}</option>
+          </select>
+          <button type="button" @click="addWorkingWeight"
+            class="h-11 px-4 rounded-xl bg-blue-600 text-white font-medium active:bg-blue-700 whitespace-nowrap">添加到基准表</button>
+        </div>
+      </section>
+
+      <!-- 基准重量表列表 -->
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-slate-300">基准重量表</h3>
+          <span class="text-xs text-slate-500">共 {{ sortedWorkingWeights.length }} 项</span>
+        </div>
+        <div v-if="sortedWorkingWeights.length === 0" class="text-center text-sm text-slate-500 py-8">
+          暂无基准动作，请在上方添加
+        </div>
+        <div v-for="item in sortedWorkingWeights" :key="item.name"
+          class="flex items-stretch gap-3 rounded-xl bg-slate-800 border border-slate-700/60 px-3 py-2">
+          <!-- ① 左侧：动作信息区（独占一列，给名称更多空间） -->
+          <div class="flex-1 min-w-0 flex flex-col justify-center gap-1">
+            <span class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</span>
+            <action-badges :level1="item.level1" :level2="item.level2"></action-badges>
+          </div>
+          <!-- ② 右侧：重量 + 元信息（两行堆叠） -->
+          <div class="flex-shrink-0 flex flex-col items-end gap-1.5">
+            <!-- 重量输入区 -->
+            <div class="flex items-center gap-1">
+              <input type="number" step="0.5" min="0"
+                :value="item.weight"
+                @input="workingWeights[item.name].weight = Math.round((Number($event.target.value)||0)*10)/10"
+                @blur="updateWorkingWeight(item.name)"
+                class="w-16 h-8 rounded-lg bg-slate-900 border border-slate-700 px-2 text-slate-100 text-sm tabular-nums text-right
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <span class="text-xs text-slate-400">kg</span>
+            </div>
+            <!-- 元信息行：时间戳 + PR + 删除 -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-slate-500">{{ formatUpdatedAt(item.updatedAt) }}</span>
+              <span class="text-xs text-slate-400 tabular-nums">
+                <template v-if="item.maxWeight != null">PR: {{ item.maxWeight }} kg</template>
+                <template v-else class="text-slate-600">-</template>
+              </span>
+              <button type="button" @click="deleteWorkingWeight(item.name)" aria-label="删除"
+                class="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
   <!-- 动作回顾面板：上次训练 + 历史最佳 -->
   <div v-if="actionRecordsPanel.open" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/60" @click="closeActionRecords"></div>
@@ -574,8 +846,11 @@
           <div class="space-y-1.5">
             <div v-for="(s, i) in lastActionRecord.sets" :key="'l'+i"
               class="flex items-center justify-between text-sm">
-              <span class="text-slate-400">第{{ i + 1 }}组</span>
-              <span class="text-slate-100 font-medium tabular-nums">{{ s.weight }} kg × {{ s.reps }} 次</span>
+              <span class="flex items-center gap-1.5">
+                <span class="text-slate-400">第{{ i + 1 }}组</span>
+                <span v-if="s.warmup" class="px-1 py-0.5 rounded text-[10px] font-semibold leading-none bg-orange-500/20 text-orange-300 border border-orange-500/30">热身</span>
+              </span>
+              <span class="font-medium tabular-nums" :class="s.warmup ? 'text-slate-500' : 'text-slate-100'">{{ s.weight }} kg × {{ s.reps }} 次</span>
             </div>
           </div>
           <div class="flex justify-between pt-2 border-t border-slate-700/60 text-xs">
@@ -597,8 +872,11 @@
           <div class="space-y-1.5">
             <div v-for="(s, i) in bestActionRecord.sets" :key="'b'+i"
               class="flex items-center justify-between text-sm">
-              <span class="text-slate-400">第{{ i + 1 }}组</span>
-              <span class="text-slate-100 font-medium tabular-nums">{{ s.weight }} kg × {{ s.reps }} 次</span>
+              <span class="flex items-center gap-1.5">
+                <span class="text-slate-400">第{{ i + 1 }}组</span>
+                <span v-if="s.warmup" class="px-1 py-0.5 rounded text-[10px] font-semibold leading-none bg-orange-500/20 text-orange-300 border border-orange-500/30">热身</span>
+              </span>
+              <span class="font-medium tabular-nums" :class="s.warmup ? 'text-slate-500' : 'text-slate-100'">{{ s.weight }} kg × {{ s.reps }} 次</span>
             </div>
           </div>
           <div class="flex justify-between pt-2 border-t border-amber-500/20 text-xs">
@@ -684,8 +962,11 @@
           <ul class="space-y-1.5">
             <li v-for="(s, si) in rec.sets" :key="si"
               class="flex items-center justify-between text-sm">
-              <span class="text-slate-400">第{{ si + 1 }}组</span>
-              <span class="text-slate-200 tabular-nums">{{ s.weight }} kg × {{ s.reps }}</span>
+              <span class="flex items-center gap-1.5">
+                <span class="text-slate-400">第{{ si + 1 }}组</span>
+                <span v-if="s.warmup" class="px-1 py-0.5 rounded text-[10px] font-semibold leading-none bg-orange-500/20 text-orange-300 border border-orange-500/30">热身</span>
+              </span>
+              <span class="tabular-nums" :class="s.warmup ? 'text-slate-500' : 'text-slate-200'">{{ s.weight }} kg × {{ s.reps }}</span>
             </li>
           </ul>
           <!-- 底部：总容量 + 删除按钮 -->
@@ -855,6 +1136,7 @@
         restTimeOptions: ['30s', '1min', '3min', '5min', '自定义'],
         restTime: '3min',
         customRestTime: '',
+        warmup: false,
         sets: [],
         // 今日睡眠状态
         sleepTime: '',
@@ -872,6 +1154,11 @@
           actionLevel2: '',
           delActionPlace: '',
           delAction: ''
+        },
+        // 基准力量面板状态
+        workingWeightsPanel: {
+          open: false,
+          addAction: ''
         },
         // 轻提示
         toast: { show: false, message: '' },
@@ -893,7 +1180,35 @@
         backfillDate: '',
         // 退阶（降重）设置：全局退阶比例(%)与重量舍入精度(kg)，持久化到 localStorage
         deloadPercent: 10,
-        deloadPrecision: 2.5
+        deloadPrecision: 2.5,
+        // ===== 个人计划（日历训练计划）=====
+        plans: [],  // [{ id, date:'YYYY-MM-DD', place, action, level1, level2, weight, reps, sets, note, completed }]
+        // 动作基准重量字典（单一数据源）：{ '卧推': { weight: 50, updatedAt: '10/12 14:30' } }
+        workingWeights: {},
+        planYear: new Date().getFullYear(),
+        planMonth: new Date().getMonth(),  // 0~11
+        planPanel: {
+          open: false,
+          date: '',          // 'YYYY-MM-DD'
+          form: { place: '', action: '', weight: null, reps: null, sets: 1, note: '' }
+        },
+        // ===== 周计划模板 =====
+        // key: 0=周日, 1=周一, ..., 6=周六；value: 训练项数组
+        weeklyTemplate: { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] },
+        templatePanel: {
+          open: false,
+          activeDay: 1,
+          form: { place: '', action: '', weight: null, reps: null, sets: 1, note: '' },
+          rangePreset: '1m',   // 1w / 1m / 3m / custom
+          rangeStart: '',
+          rangeEnd: ''
+        },
+        conflictPanel: {
+          open: false,
+          mode: null  // 'append' | 'overwrite' | null
+        },
+        // 今日计划格式化文本（联动到训练记录页）
+        todayPlanText: ''
       }
     },
     created() {
@@ -935,6 +1250,33 @@
           if (p && typeof p.deloadPrecision === 'number') this.deloadPrecision = p.deloadPrecision
         }
       } catch (e) { /* 使用默认值 */ }
+      // 加载个人训练计划
+      try {
+        const pl = localStorage.getItem('workout_plans')
+        if (pl) this.plans = JSON.parse(pl) || []
+      } catch (e) { this.plans = [] }
+      // 加载动作基准重量字典
+      try {
+        const ww = localStorage.getItem('working_weights')
+        if (ww) this.workingWeights = JSON.parse(ww) || {}
+      } catch (e) { this.workingWeights = {} }
+      // 加载周计划模板
+      try {
+        const wt = localStorage.getItem('weekly_template')
+        if (wt) {
+          const parsed = JSON.parse(wt)
+          if (parsed && typeof parsed === 'object') {
+            for (let i = 0; i <= 6; i++) {
+              if (Array.isArray(parsed[i])) this.weeklyTemplate[i] = parsed[i]
+            }
+          }
+        }
+      } catch (e) { /* 使用默认空模板 */ }
+      // 初始化计划表单与模板表单的地点默认值
+      const firstPlace = Object.keys(this.config)[0] || ''
+      this.planPanel.form.place = firstPlace
+      this.templatePanel.form.place = firstPlace
+      this.templatePanel.form.action = (this.config[firstPlace] || [])[0]?.name || ''
     },
     mounted() {
       // 暴露根实例到 window，便于调试
@@ -969,27 +1311,21 @@
         else if (hoursAgo < 48) color = '#facc15'
         else if (hoursAgo < 72) color = '#60a5fa'
         const lastSet = rec.sets[rec.sets.length - 1]
+        // 回填用"最后一个正式组"（非热身），避免热身组的轻重量污染下次输入
+        const workingSets = (rec.sets || []).filter(s => !s.warmup)
+        const refSet = workingSets.length > 0 ? workingSets[workingSets.length - 1] : lastSet
         return {
           hoursAgo,
           color,
-          lastWeight: lastSet.weight,
-          lastReps: lastSet.reps,
-          lastSets: rec.sets.length
+          lastWeight: refSet.weight,
+          lastReps: refSet.reps,
+          lastSets: workingSets.length || rec.sets.length
         }
       },
-      // 当前动作的历史最佳记录：单组最大重量最高，并列时取总容量最大
+      // 当前动作的历史最佳记录：复用 getBestRecordForAction
       bestActionRecord() {
         if (!this.action) return null
-        const matched = this.allHistory.filter(r => r.action === this.action)
-        if (matched.length === 0) return null
-        return matched.slice().sort((a, b) => {
-          const maxA = Math.max(...(a.sets || []).map(s => Number(s.weight) || 0))
-          const maxB = Math.max(...(b.sets || []).map(s => Number(s.weight) || 0))
-          if (maxB !== maxA) return maxB - maxA
-          const volA = Number(a.totalVolume) || (a.sets || []).reduce((s, x) => s + (Number(x.weight) * Number(x.reps) || 0), 0)
-          const volB = Number(b.totalVolume) || (b.sets || []).reduce((s, x) => s + (Number(x.weight) * Number(x.reps) || 0), 0)
-          return volB - volA
-        })[0]
+        return this.getBestRecordForAction(this.action)
       },
       // 趋势图数据点：当前动作、时间范围内，按日期升序，取每条记录的最大重量
       trendData() {
@@ -1086,6 +1422,89 @@
       // 状态徽章的颜色 / 文本
       scoreInfo() {
         return this.getScoreInfo(this.todayScore)
+      },
+      // ===== 个人计划日历 =====
+      // 当前查看月份的标题，如 "2026 年 10 月"
+      planMonthLabel() {
+        return `${this.planYear} 年 ${this.planMonth + 1} 月`
+      },
+      // 当月日历网格：6 行 × 7 列，每格 { date, day, inMonth, isToday, items }
+      calendarDays() {
+        const y = this.planYear
+        const m = this.planMonth
+        const firstDay = new Date(y, m, 1)
+        const firstWeekday = firstDay.getDay()  // 0=周日
+        const daysInMonth = new Date(y, m + 1, 0).getDate()
+        const today = new Date()
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+        const pad = n => String(n).padStart(2, '0')
+        const cells = []
+        // 前置空位（上月末尾）
+        for (let i = 0; i < firstWeekday; i++) {
+          const d = new Date(y, m, i - firstWeekday + 1)
+          cells.push({ date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`, day: d.getDate(), inMonth: false, isToday: false })
+        }
+        // 当月日期
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateKey = `${y}-${pad(m+1)}-${pad(d)}`
+          cells.push({ date: dateKey, day: d, inMonth: true, isToday: dateKey === todayKey })
+        }
+        // 补齐至 42 格（6 周）
+        let next = 1
+        while (cells.length < 42) {
+          const d = new Date(y, m + 1, next++)
+          cells.push({ date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`, day: d.getDate(), inMonth: false, isToday: false })
+        }
+        return cells
+      },
+      // 按日期分组的计划 Map，便于日历格与详情面板快速取数
+      plansByDate() {
+        const map = {}
+        for (const p of this.plans) {
+          if (!map[p.date]) map[p.date] = []
+          map[p.date].push(p)
+        }
+        return map
+      },
+      // 计划面板：当前选中日期的计划列表
+      planPanelItems() {
+        return this.plansByDate[this.planPanel.date] || []
+      },
+      // 动作库中所有动作（扁平化为数组，供基准力量面板下拉选择）
+      allActions() {
+        const list = []
+        for (const place in this.config) {
+          for (const a of (this.config[place] || [])) {
+            list.push({ name: a.name, level1: a.level1 || '', level2: a.level2 || '', place })
+          }
+        }
+        return list.sort((a, b) => {
+          const l1 = (a.level1 || '').localeCompare(b.level1 || '')
+          return l1 !== 0 ? l1 : a.name.localeCompare(b.name)
+        })
+      },
+      // 基准重量表：按一级分类分组排序后展开为数组
+      sortedWorkingWeights() {
+        const entries = []
+        for (const name in this.workingWeights) {
+          const entry = this.workingWeights[name]
+          const actionObj = this.allActions.find(a => a.name === name) || {}
+          entries.push({
+            name,
+            weight: entry && typeof entry === 'object' ? (entry.weight || 0) : (entry || 0),
+            updatedAt: entry && typeof entry === 'object' ? (entry.updatedAt || '') : '',
+            level1: actionObj.level1 || '',
+            level2: actionObj.level2 || '',
+            maxWeight: this.getMaxWeightForAction(name)
+          })
+        }
+        const order = LEVEL1_OPTIONS
+        return entries.sort((a, b) => {
+          const ia = order.indexOf(a.level1)
+          const ib = order.indexOf(b.level1)
+          if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+          return a.name.localeCompare(b.name)
+        })
       }
     },
     watch: {
@@ -1103,6 +1522,27 @@
       deloadPrecision(val) {
         try { localStorage.setItem('deload_settings', JSON.stringify({ deloadPercent: this.deloadPercent, deloadPrecision: val })) } catch (e) {}
       },
+      // 个人计划持久化
+      plans: {
+        deep: true,
+        handler(val) {
+          try { localStorage.setItem('workout_plans', JSON.stringify(val)) } catch (e) {}
+        }
+      },
+      // 周计划模板持久化
+      weeklyTemplate: {
+        deep: true,
+        handler(val) {
+          try { localStorage.setItem('weekly_template', JSON.stringify(val)) } catch (e) {}
+        }
+      },
+      // 基准重量字典持久化
+      workingWeights: {
+        deep: true,
+        handler(val) {
+          try { localStorage.setItem('working_weights', JSON.stringify(val)) } catch (e) {}
+        }
+      },
       // 趋势图时间范围变化时重渲染
       trendRange() { if (this.actionRecordsPanel.open) this.renderTrendChart() },
       trendStartDate() { if (this.actionRecordsPanel.open && this.trendRange === 'custom') this.renderTrendChart() },
@@ -1118,8 +1558,61 @@
       }
     },
     methods: {
+      // ===== 基准力量（workingWeights）=====
+      // 读取动作基准重量，缺失返回 null
+      getWorkingWeight(action) {
+        const entry = this.workingWeights[action]
+        if (entry && typeof entry === 'object') return entry.weight
+        if (typeof entry === 'number') return entry
+        return null
+      },
+      // 写入动作基准重量并更新时间戳（MM/DD HH:mm）
+      setWorkingWeight(action, weight) {
+        const d = new Date()
+        const ts = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+        this.workingWeights = {
+          ...this.workingWeights,
+          [action]: { weight: Math.round((Number(weight) || 0) * 10) / 10, updatedAt: ts }
+        }
+      },
+      // 从基准表删除动作
+      deleteWorkingWeight(action) {
+        const next = { ...this.workingWeights }
+        delete next[action]
+        this.workingWeights = next
+      },
+      // 格式化时间戳为 "10/12更新"
+      formatUpdatedAt(ts) {
+        if (!ts) return '未更新'
+        const m = ts.match(/^(\d{2})\/(\d{2})/)
+        return m ? `${m[1]}/${m[2]}更新` : ts
+      },
+      openWorkingWeights() {
+        // 默认选中第一个未加入基准表的动作
+        const exists = new Set(Object.keys(this.workingWeights))
+        const first = this.allActions.find(a => !exists.has(a.name))
+        this.workingWeightsPanel.addAction = first ? first.name : ''
+        this.workingWeightsPanel.open = true
+      },
+      closeWorkingWeights() { this.workingWeightsPanel.open = false },
+      addWorkingWeight() {
+        const name = this.workingWeightsPanel.addAction
+        if (!name) return
+        if (this.workingWeights[name]) { this.showToast('已在基准表中'); return }
+        this.setWorkingWeight(name, 0)
+        // 自动选中下一个未加入的动作
+        const exists = new Set(Object.keys(this.workingWeights))
+        const next = this.allActions.find(a => !exists.has(a.name))
+        this.workingWeightsPanel.addAction = next ? next.name : ''
+      },
+      updateWorkingWeight(name) {
+        const w = this.workingWeights[name]?.weight
+        this.setWorkingWeight(name, w)
+      },
       // 根据当前动作的最近训练记录回填重量/次数
       applyLastActionValues() {
+        // 切换动作时重置热身标记，避免沿用上一动作的状态
+        this.warmup = false
         const info = this.lastActionInfo
         if (info) {
           if (info.lastWeight != null) this.weight = info.lastWeight
@@ -1237,7 +1730,7 @@
         const rt = this.restTime === '自定义'
           ? (this.customRestTime.trim() || '自定义')
           : this.restTime
-        this.sets.push({ weight: w, reps: r, restTime: rt })
+        this.sets.push({ weight: w, reps: r, restTime: rt, warmup: !!this.warmup })
         // 关键：不重置 restTime / customRestTime，保持状态驻留
       },
       removeSet(index) {
@@ -1300,7 +1793,7 @@
           date: recordDate,
           place: this.place,
           action: this.action,
-          sets: this.sets.map(s => ({ weight: s.weight, reps: s.reps, restTime: s.restTime || '' })),
+          sets: this.sets.map(s => ({ weight: s.weight, reps: s.reps, restTime: s.restTime || '', warmup: !!s.warmup })),
           totalVolume: this.totalVolume,
           // 补录历史训练时，当日睡眠评分无意义，置空
           sleepScore: this.backfillMode ? null : this.todayScore,
@@ -1321,9 +1814,9 @@
         this.sets = []
         this.weight = 60
         this.reps = 4
+        this.warmup = false
         this.showToast('记录保存成功')
       },
-      cancel() {},
       // 轻提示：2 秒后自动消失
       showToast(message) {
         this.toast.message = message
@@ -1399,6 +1892,25 @@
       recordMaxWeight(rec) {
         if (!rec || !rec.sets) return 0
         return Math.max(...rec.sets.map(s => Number(s.weight) || 0))
+      },
+      // 【可复用】获取某动作的历史最佳记录（单组最大重量最高，并列取总容量最大）
+      getBestRecordForAction(actionName) {
+        const matched = this.allHistory.filter(r => r.action === actionName)
+        if (matched.length === 0) return null
+        return matched.slice().sort((a, b) => {
+          const maxA = Math.max(...(a.sets || []).map(s => Number(s.weight) || 0))
+          const maxB = Math.max(...(b.sets || []).map(s => Number(s.weight) || 0))
+          if (maxB !== maxA) return maxB - maxA
+          const volA = Number(a.totalVolume) || (a.sets || []).reduce((s, x) => s + (Number(x.weight) * Number(x.reps) || 0), 0)
+          const volB = Number(b.totalVolume) || (b.sets || []).reduce((s, x) => s + (Number(x.weight) * Number(x.reps) || 0), 0)
+          return volB - volA
+        })[0]
+      },
+      // 【可复用】获取某动作的历史最高重量数值，无记录返回 null
+      getMaxWeightForAction(actionName) {
+        const rec = this.getBestRecordForAction(actionName)
+        if (!rec) return null
+        return this.recordMaxWeight(rec)
       },
       // 计算时间范围起止时间戳
       trendRangeBounds() {
@@ -1531,6 +2043,227 @@
         const pad = n => String(n).padStart(2, '0')
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
       },
+      // ===== 个人计划（日历）相关方法 =====
+      // 切换上/下月
+      prevMonth() {
+        if (this.planMonth === 0) { this.planMonth = 11; this.planYear-- }
+        else { this.planMonth-- }
+      },
+      nextMonth() {
+        if (this.planMonth === 11) { this.planMonth = 0; this.planYear++ }
+        else { this.planMonth++ }
+      },
+      goToday() {
+        const t = new Date()
+        this.planYear = t.getFullYear()
+        this.planMonth = t.getMonth()
+      },
+      // 点击日期打开详情面板
+      openPlanPanel(date) {
+        this.planPanel.date = date
+        // 表单默认值：地点取第一个，动作取该地点第一个
+        const place = this.planPanel.form.place || Object.keys(this.config)[0] || ''
+        const acts = this.config[place] || []
+        this.planPanel.form = {
+          place,
+          action: acts.length ? acts[0].name : '',
+          weight: null,
+          reps: null,
+          sets: 1,
+          note: ''
+        }
+        this.planPanel.open = true
+      },
+      closePlanPanel() { this.planPanel.open = false },
+      // 计划面板中切换地点时联动动作
+      onPlanPlaceChange() {
+        const acts = this.config[this.planPanel.form.place] || []
+        this.planPanel.form.action = acts.length ? acts[0].name : ''
+      },
+      // 添加一条计划
+      addPlan() {
+        const f = this.planPanel.form
+        if (!f.action) { this.showToast('请选择动作'); return }
+        const actionObj = (this.config[f.place] || []).find(a => a.name === f.action) || {}
+        this.plans.push({
+          id: Date.now() + Math.random().toString(36).slice(2, 8),
+          date: this.planPanel.date,
+          place: f.place,
+          action: f.action,
+          level1: actionObj.level1 || '',
+          level2: actionObj.level2 || '',
+          weight: f.weight != null ? Number(f.weight) : null,
+          reps: f.reps != null ? Number(f.reps) : null,
+          sets: f.sets ? Number(f.sets) : 1,
+          note: (f.note || '').trim(),
+          completed: false
+        })
+        // 重置表单但保留地点
+        const keepPlace = f.place
+        const acts = this.config[keepPlace] || []
+        this.planPanel.form = {
+          place: keepPlace,
+          action: acts.length ? acts[0].name : '',
+          weight: null,
+          reps: null,
+          sets: 1,
+          note: ''
+        }
+        this.showToast('计划已添加')
+      },
+      // 删除一条计划
+      deletePlan(id) {
+        this.plans = this.plans.filter(p => p.id !== id)
+      },
+      // 切换计划完成状态
+      togglePlanComplete(id) {
+        const p = this.plans.find(x => x.id === id)
+        if (p) p.completed = !p.completed
+      },
+      // 格式化面板标题日期：YYYY-MM-DD → M月D日 周X
+      planPanelDateLabel() {
+        if (!this.planPanel.date) return ''
+        const [y, m, d] = this.planPanel.date.split('-').map(Number)
+        const dt = new Date(y, m - 1, d)
+        const week = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六']
+        return `${m}月${d}日 ${week[dt.getDay()]}`
+      },
+      // ===== 周计划模板 =====
+      openTemplatePanel() {
+        this.templatePanel.open = true
+      },
+      closeTemplatePanel() { this.templatePanel.open = false },
+      // 模板表单地点切换联动动作
+      onTemplatePlaceChange() {
+        const acts = this.config[this.templatePanel.form.place] || []
+        this.templatePanel.form.action = acts.length ? acts[0].name : ''
+      },
+      // 向当前选中的星期添加一个训练项
+      addTemplateItem() {
+        const f = this.templatePanel.form
+        if (!f.action) { this.showToast('请选择动作'); return }
+        const actionObj = (this.config[f.place] || []).find(a => a.name === f.action) || {}
+        this.weeklyTemplate[this.templatePanel.activeDay].push({
+          place: f.place,
+          action: f.action,
+          level1: actionObj.level1 || '',
+          level2: actionObj.level2 || '',
+          weight: f.weight != null ? Number(f.weight) : null,
+          reps: f.reps != null ? Number(f.reps) : null,
+          sets: f.sets ? Number(f.sets) : 1,
+          note: (f.note || '').trim()
+        })
+        // 重置表单（保留地点）
+        const keepPlace = f.place
+        const acts = this.config[keepPlace] || []
+        this.templatePanel.form = {
+          place: keepPlace,
+          action: acts.length ? acts[0].name : '',
+          weight: null,
+          reps: null,
+          sets: 1,
+          note: ''
+        }
+        this.showToast('已添加到模板')
+      },
+      deleteTemplateItem(day, idx) {
+        this.weeklyTemplate[day].splice(idx, 1)
+      },
+      // 计算批量填充的日期范围（本地时区，避免 UTC 偏移）
+      getTemplateRangeBounds() {
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        let start = today
+        let end = today
+        const p = this.templatePanel.rangePreset
+        if (p === '1w') end = new Date(today.getTime() + 6 * 86400000)
+        else if (p === '1m') end = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate() - 1)
+        else if (p === '3m') end = new Date(today.getFullYear(), today.getMonth() + 3, today.getDate() - 1)
+        else if (p === 'custom') {
+          if (this.templatePanel.rangeStart) start = new Date(this.templatePanel.rangeStart + 'T00:00:00')
+          if (this.templatePanel.rangeEnd) end = new Date(this.templatePanel.rangeEnd + 'T00:00:00')
+        }
+        return { start, end }
+      },
+      // 核心：批量生成计划（遍历日期范围，按星期取模板深拷贝写入）
+      generatePlansFromTemplate() {
+        const { start, end } = this.getTemplateRangeBounds()
+        if (start > end) { this.showToast('开始日期不能晚于结束日期'); return }
+        // 检测是否有冲突日期
+        const conflictDates = []
+        const pad = n => String(n).padStart(2, '0')
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const key = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+          const tpl = this.weeklyTemplate[d.getDay()] || []
+          if (tpl.length > 0 && this.plansByDate[key]) conflictDates.push(key)
+        }
+        // 有冲突且用户未选择处理方式 → 弹窗
+        if (conflictDates.length > 0 && !this.conflictPanel.mode) {
+          this.conflictPanel.open = true
+          return
+        }
+        // 执行写入
+        const mode = this.conflictPanel.mode || 'append'
+        let count = 0
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const key = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+          const tpl = this.weeklyTemplate[d.getDay()] || []
+          if (tpl.length === 0) continue
+          const existing = this.plansByDate[key] || []
+          if (mode === 'overwrite' && existing.length > 0) {
+            // 覆盖：删除该日期现有计划
+            this.plans = this.plans.filter(p => p.date !== key)
+          }
+          // 深拷贝模板项写入
+          for (const item of tpl) {
+            this.plans.push({
+              id: Date.now() + Math.random().toString(36).slice(2, 8),
+              date: key,
+              ...JSON.parse(JSON.stringify(item)),
+              completed: false
+            })
+            count++
+          }
+        }
+        // 重置冲突状态
+        this.conflictPanel.mode = null
+        this.closeTemplatePanel()
+        this.showToast(`已生成 ${count} 条计划`)
+      },
+      // 冲突处理：用户选择追加或覆盖
+      resolveConflict(mode) {
+        this.conflictPanel.mode = mode
+        this.conflictPanel.open = false
+        this.generatePlansFromTemplate()
+      },
+      cancelConflict() {
+        this.conflictPanel.mode = null
+        this.conflictPanel.open = false
+      },
+      // ===== 训练计划 → 记录联动 =====
+      // 纯函数：将计划数组格式化为 "动作-重量*组数*次数" 字符串
+      formatPlanText(plans) {
+        if (!plans || plans.length === 0) return ''
+        return plans.map(p => {
+          const parts = [p.action]
+          const w = p.weight != null ? p.weight : '-'
+          const s = p.sets || 1
+          const r = p.reps != null ? p.reps : '-'
+          parts.push(`${w}*${s}*${r}`)
+          return parts.join('-')
+        }).join('\n')
+      },
+      // 开始训练：读取当天计划，格式化后切换到训练记录页
+      startTraining() {
+        const today = new Date()
+        const pad = n => String(n).padStart(2, '0')
+        const todayKey = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`
+        const todayPlans = this.plansByDate[todayKey] || []
+        this.todayPlanText = this.formatPlanText(todayPlans)
+        this.closePlanPanel()
+        this.activeTab = 'log'
+        if (todayPlans.length === 0) this.showToast('今日暂无训练计划')
+      },
       // ===== 导出 CSV =====
       exportCSV() {
         let history = []
@@ -1539,7 +2272,7 @@
           if (!Array.isArray(history)) history = []
         } catch (e) { history = [] }
 
-        const header = ['日期', '地点', '动作', '组数序号', '重量(kg)', '次数', '单组容量(kg)', '组间歇', '睡眠得分']
+        const header = ['日期', '地点', '动作', '组数序号', '重量(kg)', '次数', '单组容量(kg)', '组间歇', '热身', '睡眠得分']
         const rows = []
         history.forEach(rec => {
           const sets = Array.isArray(rec.sets) ? rec.sets : []
@@ -1554,6 +2287,7 @@
               s.reps,
               volume,
               s.restTime || '',
+              s.warmup ? '是' : '否',
               rec.sleepScore != null ? rec.sleepScore : ''
             ])
           })
@@ -1589,7 +2323,7 @@
   // 注册 Service Worker（file:// 打开时跳过，需通过 http(s) 访问）
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=36').catch(() => {})
+      navigator.serviceWorker.register('sw.js?v=43').catch(() => {})
     })
   }
 </script>
